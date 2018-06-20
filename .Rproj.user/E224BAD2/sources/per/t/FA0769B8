@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1529422402775.000,
+    "dirty" : true,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2088349598",
+    "id" : "FA0769B8",
+    "lastKnownWriteTime" : 1527782367,
+    "last_content_update" : 1529489326014,
+    "path" : "~/Dropbox/ProteoSign/src/MSdiffexp.R",
+    "project_path" : "src/MSdiffexp.R",
+    "properties" : {
+        "cursorPosition" : "966,45",
+        "scrollLine" : "966"
+    },
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

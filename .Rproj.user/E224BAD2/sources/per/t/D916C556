@@ -1,0 +1,22 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1529419906580.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2809439956",
+    "id" : "D916C556",
+    "lastKnownWriteTime" : 1529419918,
+    "last_content_update" : 1529419918183,
+    "path" : "~/Dropbox/ProteoSign/src/dirty.R",
+    "project_path" : "src/dirty.R",
+    "properties" : {
+        "cursorPosition" : "1176,0",
+        "scrollLine" : "1146"
+    },
+    "relative_order" : 4,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
