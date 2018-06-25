@@ -23,14 +23,24 @@ check.packages <- function(packages) {
 packages <- c("data.table")
 
 # Add packages used during development only
-if(development.enviroment == TRUE) {
+if(global.variables[["development.stage"]] == TRUE) {
   packages <- c(packages, "rbenchmark")
 }
+
+# Temporary reset current working directory
+# in order to work packrat package installation
+setwd(here())
 
 # Install missing packages
 check.packages(packages)
 
+# Reset current working
+setwd(here("src"))
+
 # Load all packages
 invisible(lapply(packages, require, character.only = TRUE))
+
+# Save loaded packages in packrat
+snapshot()
 
 source("functions.R")
