@@ -39,20 +39,12 @@ init(here())
 #Set packrat mode ON
 packrat_mode(on = TRUE)
 
-# Set it as global so other scipts can also see this
-global.variables <- list("no.DB" = TRUE)
-
 # Scripts to call
-files.to.load <- c( "initialize.R")#,
-                    #"load_data.R",
-                    #"pull_data_from_DB.R",
+files.to.load <- c( "initialize.R",
+                    "load_data.R")#,
                     #"build.R",
                     #"analyze.R")
 
-# Remove database script if not used
-if (global.variables[["no.DB"]] == TRUE) {
-  files.to.load <- files.to.load[-c(3)]
-}
 
 # Set the currenct working directory
 setwd(here("src"))

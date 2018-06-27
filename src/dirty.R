@@ -180,7 +180,8 @@ clean.file.from.quotes <- function(file.name) {
   file.first.line <- readLines(file.name, n=1)
   have.quotes <- grepl("\"", file.first.line)
   cat('Reading', file.name, '...\n')
-  input.data <- fread(file.name, integer64 = "numeric")
+  # Moved to load_data.R
+  # input.data <- fread(file.name, integer64 = "numeric")
   if (have.quotes == TRUE) {
     cat("Removing double quotes from input data file", file.name, "...\n")
     
@@ -298,7 +299,8 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
                                         time.point,
                                         keep.evidence.ids=F,
                                         is.proteome.discoverer.data) {
-  cat("Reading data file...\n")
+  # Moved to load_data.R
+  # cat("Reading data file...\n")
   protein.groups.column <- ""
   
   evidence.data <- clean.file.from.quotes(evidence.file)
@@ -947,14 +949,15 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
 
 
 perform_analysis <- function() {
-  
-  ProteinQuantitation <- TRUE
+  # Moved to initialize.R
+  # ProteinQuantitation <- TRUE
   
   # rep_structure<-read.table(experimental_structure_file,col.names=c("raw_file","biorep","techrep","fraction"), sep="\t")
+  # Moved to initialize.R
+  # replicate.multiplexing.is.used <- FALSE
   
-  replicate.multiplexing.is.used <- FALSE
-  
-  experimental.structure <- read.csv("~/experimental-structure.csv")
+  # Added to load_data_R
+  # experimental.structure <- read.csv("~/experimental-structure.csv")
   
   experimental.structure <- experimental.structure[
     order(experimental.structure$conditions,
@@ -1053,9 +1056,12 @@ perform_analysis <- function() {
   
   dir.create(limma.output.folder)
   
-  evidence.file <- "Dropbox/Review/case studies/evidence.txt"
-  protein.groups.file <- "Dropbox/Review/case studies/cleanProteinGroups.txt"
-  is.proteome.discoverer.data <- FALSE
+  # Moved to load_data.R
+  # evidence.file <- "Dropbox/Review/case studies/evidence.txt"
+  # protein.groups.file <- "Dropbox/Review/case studies/cleanProteinGroups.txt"
+  
+  # Moved to initialize.R
+  # is.proteome.discoverer.data <- FALSE
   
   cat("Calling read.protein.groups.data ...\n")
   protein.groups <- read.protein.groups.data_v3(protein.groups.file,

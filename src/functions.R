@@ -5,16 +5,9 @@
 rm(list = grep("^global.variables", ls(), value = TRUE, invert = TRUE))
 
 # Functions scripts to load
-functions.subfiles <- c("functions_initialize.R",
-                        "functions_load_data.R",
-                        "functions_pull_data_from_DB.R",
-                        "functions_build.R",
-                        "functions_analyze.R"
-)
-# If no database is used, do not call the respective script
-if (global.variables$no.DB == TRUE) {
-  functions.subfiles <- functions.subfiles[-c(3)]
-}
+functions.subfiles <- c("functions_build.R",
+                        "functions_analyze.R")
+
 
 invisible(lapply(functions.subfiles, source))
 

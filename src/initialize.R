@@ -4,7 +4,10 @@
 # Clear enviroment
 rm(list = grep("^global.variables", ls(), value = TRUE, invert = TRUE))
 
-global.variables[["development.stage"]] <- TRUE
+global.variables <- list("development.stage" = TRUE,
+                         "protein.quantitation" = TRUE,
+                         "replicate.multiplexing.is.used" = FALSE,
+                         "is.proteome.discoverer.data" = FALSE)
 
 check.packages <- function(packages) {
   # Checks to see if desired packages are installed and if they are not, it installs them.
