@@ -127,7 +127,7 @@ restore.replicates <- function(replicates.per.condition) {
   return (restored.replicates)
 }
 
-check.number.of.replicates <- function(replicate.multiplexing.is.used, replicates) {
+check.replicates.number <- function(replicate.multiplexing.is.used, replicates) {
   number.of.replicates <- length(unique(replicates)) 
   if (replicate.multiplexing.is.used == FALSE && number.of.replicates <= 1) {
     return (FALSE)

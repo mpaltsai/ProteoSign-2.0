@@ -31,9 +31,10 @@ evidence.data <- fread(evidence.file, integer64 = "numeric")
 
 cat("Evidence file loaded!\n")
 
-# Add them in the global variables list
+# Add experimental structure and the evidence data
+# to the global variables list
+global.variables[["experimental.structure"]] <- experimental.structure.table
 global.variables[["evidence.data"]] <- evidence.data
-global.variables[["protein.groups.data"]] <- protein.groups.data
 
 # If data come from MaxQuant Software, find the proteinGroups file and read it
 if( global.variables[["is.proteome.discoverer.data"]] == FALSE) {
@@ -41,6 +42,8 @@ if( global.variables[["is.proteome.discoverer.data"]] == FALSE) {
   cat("Reading proteinGroups file: ", protein.groups.file,"...\n", sep = "")
   protein.groups.data <- fread(protein.groups.file, integer64 = "numeric")
   cat("ProteinGroups file loaded!\n")
+  global.variables[["protein.groups.data"]] <- protein.groups.data
+  
 }
 
 
