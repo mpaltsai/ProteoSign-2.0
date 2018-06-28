@@ -1,34 +1,34 @@
 # All functions exist in this file. If they are too many, they can be separeted in
 # several functions_XXX.R files.
 
-library(log4r)
-library(gdata)
-library(pryr)
+# library(log4r)
+# library(gdata)
+# library(pryr)
 
 # Confirmed linraries
-library(data.table)
-library(feather)
+# library(data.table)
+# library(feather)
 
-replicates.per.condition <- function(biological.replicates, technical.replicates, conditions) {
-  
-  replicates.per.condition <- list()
-  unique.conditions <- unique(conditions)
-  
-  for (condition in unique.conditions) {
-    raw.files.per.condition <- which(condition == conditions)
-    biological.replicates.per.condition <- biological.replicates[raw.files.per.condition]
-    technical.replicates.per.condition <- technical.replicates[raw.files.per.condition]
-    new.element <- list("biological" = biological.replicates.per.condition,
-                        "technical"= technical.replicates.per.condition)
-    if (length(replicates.per.condition) == 0 ) {
-      replicates.per.condition <- new.element
-    } else {
-      replicates.per.condition <- list(replicates.per.condition, new.element)
-    }
-  }
-  names(replicates.per.condition) <-  unique.conditions
-  return (replicates.per.condition)
-}
+# replicates.per.condition <- function(biological.replicates, technical.replicates, conditions) {
+#   
+#   replicates.per.condition <- list()
+#   unique.conditions <- unique(conditions)
+#   
+#   for (condition in unique.conditions) {
+#     raw.files.per.condition <- which(condition == conditions)
+#     biological.replicates.per.condition <- biological.replicates[raw.files.per.condition]
+#     technical.replicates.per.condition <- technical.replicates[raw.files.per.condition]
+#     new.element <- list("biological" = biological.replicates.per.condition,
+#                         "technical"= technical.replicates.per.condition)
+#     if (length(replicates.per.condition) == 0 ) {
+#       replicates.per.condition <- new.element
+#     } else {
+#       replicates.per.condition <- list(replicates.per.condition, new.element)
+#     }
+#   }
+#   names(replicates.per.condition) <-  unique.conditions
+#   return (replicates.per.condition)
+# }
 
 replicates.status.per.condition <- function(replicates.per.condition) {
   
@@ -127,14 +127,15 @@ restore.replicates <- function(replicates.per.condition) {
   return (restored.replicates)
 }
 
-check.replicates.number <- function(replicate.multiplexing.is.used, replicates) {
-  number.of.replicates <- length(unique(replicates)) 
-  if (replicate.multiplexing.is.used == FALSE && number.of.replicates <= 1) {
-    return (FALSE)
-  } else {
-    return (TRUE)
-  }
-}
+# Moved to functions_build.R
+# check.replicates.number <- function(replicate.multiplexing.is.used, replicates) {
+#   number.of.replicates <- length(unique(replicates)) 
+#   if (replicate.multiplexing.is.used == FALSE && number.of.replicates <= 1) {
+#     return (FALSE)
+#   } else {
+#     return (TRUE)
+#   }
+# }
 
 make.experimental.description <- function(experimental.setup.id, biological.replicates, technical.replicates, fractions) {
   experimental.description <- c()

@@ -25,7 +25,7 @@ chooseBioCmirror(graphics = FALSE, ind = 1)
 setRepositories(graphics = FALSE, ind = 1:4)
 
 # Project Packages to be installed
-packages <- c("packrat", "here")
+packages <- c("packrat", "here", "devtools")
 
 # Install missing packages
 check.packages(packages)
@@ -34,10 +34,15 @@ check.packages(packages)
 invisible(lapply(packages, require, character.only = TRUE))
 
 # Initialize packarat
-init(here())
+if(dir.exists("packrat") == FALSE){
+  init(here())
+}
 
 #Set packrat mode ON
 packrat_mode(on = TRUE)
+
+# Install TODOR addin for TODOs
+install_github("dokato/todor")
 
 # Scripts to call
 files.to.load <- c( "initialize.R",
@@ -50,7 +55,7 @@ files.to.load <- c( "initialize.R",
 setwd(here("src"))
 
 # Take a packrat snapshot
-snapshot(dry.run = TRUE)
+snapshot()
 
 # Run the scripts
 successful.run <- unlist(lapply(files.to.load, source))

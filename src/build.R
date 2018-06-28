@@ -18,6 +18,7 @@ experimental.structure <- experimental.structure[
 
 # Correct the rownames
 rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
+
 # Store each column on a separate variable
 biological.replicates.list <- experimental.structure$biorep
 technical.replicates.list <- experimental.structure$techrep
@@ -36,10 +37,14 @@ if (biological.replicates.number.status  == FALSE) {
   return (FALSE)
 }
 
+# Make a list of list where each element is a condition paired
+# with its biological and technical replicates
 replicates.per.condition <- replicates.per.condition(biological.replicates.list,
                                                      technical.replicates.list,
                                                      experimental.conditions.list)
 
+# Make a list of list where each element is a condition paired
+# with booleans regarding the correctness of biological and technical replicates
 replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
 
 
