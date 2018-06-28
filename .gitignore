@@ -7,3 +7,6 @@ src/*.so
 src/*.dll
 packrat/lib*/
 packrat/
+data-input/
+data-output/
+info/
