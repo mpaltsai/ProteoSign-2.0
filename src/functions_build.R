@@ -1,12 +1,21 @@
 check.replicates.number <- function(replicate.multiplexing, replicates) {
+  #
   # Check if the replicates are more than 1, providing that we do not utilize replicates multiplexing
   #
   # Args:
   #   replicate.multiplexing: Boolean variable regarding the existence or not of replicates multiplexing
   #   replicates:             A vector of replicates 
+  #
   # Returns:
-  #   TRUE if the number of replicates is correct, otherwise FALSE
-  number.of.replicates <- length(unique(replicates)) 
+  #   TRUE:   The number of replicates is correct
+  #   FALSE:  The number of replicates is incorrect
+  #
+  
+  # Get number of unique replicates 
+  number.of.replicates <- length(unique(replicates))
+  
+  # Assure that number of replicates is more than one
+  # (We only allow this if there is replicate multiplexing)
   if (replicate.multiplexing == FALSE &&
       number.of.replicates <= 1) {
     return (FALSE)
@@ -16,12 +25,14 @@ check.replicates.number <- function(replicate.multiplexing, replicates) {
 }
 
 replicates.per.condition <- function(biological.replicates, technical.replicates, conditions) {
+  #
   # Finds out which biological and technical replicates belong to each condition
   #
   # Args:
   #   biological.replicates:A vector with the biological replicates
   #   technical.replicates: A vector with the technical replicates
   #   conditions:           A vector with the conditions
+  #
   # Returns:
   #   A list of lists. Each element contains the 2 biological and technical replicates 
   #   vectors, belonging to each condition
@@ -29,6 +40,7 @@ replicates.per.condition <- function(biological.replicates, technical.replicates
   #   condition: The condition name 
   #     biological: A vector with the biological replicates for the parent condition
   #     technical:  A vector with the technical replicates for the parent condition
+  #
   
   # Make empty list for replicates per condition
   replicates.per.condition <- list()
@@ -64,6 +76,7 @@ replicates.per.condition <- function(biological.replicates, technical.replicates
 }
 
 check.replicates <- function(biological.replicates, technical.replicates) {
+  #
   # Checks if the replicates numbering is correct e.g. 1,2,3 is correct and 1,2,4 is wrong
   #
   # Args:
@@ -73,8 +86,10 @@ check.replicates <- function(biological.replicates, technical.replicates) {
   # Returns:
   #   A list with 2 booleans for each replicate type (biological/technical) regarding 
   #   if the numbering is correct or not
+  #
   #   biological: TRUE if the numbering is correct, otherwise FALSE
-  #   technical: TRUE if the numbering is correct, otherwise FALSE
+  #   technical:  TRUE if the numbering is correct, otherwise FALSE
+  #
   
   # Find the unique numbers for each vector and sort them
   unique.biological.replicates <-  unique(biological.replicates)
@@ -96,6 +111,7 @@ check.replicates <- function(biological.replicates, technical.replicates) {
 }
 
 replicates.status.per.condition <- function(replicates.per.condition) {
+  #
   # Makes a list of list, in which each element list corresponds to a condition
   # and contains 2 booleans for the correctness of the biological and technical
   # replicates numbering for this condition
@@ -111,6 +127,7 @@ replicates.status.per.condition <- function(replicates.per.condition) {
   #   condition: The condition name 
   #     biological: A boolean for the correctness of the biological replicates
   #     technical:  A boolean for the correctness of the technical replicates
+  #
   
   # Make the list
   replicates.status.per.condition <- list()
@@ -134,4 +151,119 @@ replicates.status.per.condition <- function(replicates.per.condition) {
   # Finally add the condition name
   names(replicates.status.per.condition) <- names(replicates.per.condition)
   return (replicates.status.per.condition)
+}
+
+fix.replicates <- function(biological.replicates, technical.replicates) {
+  #
+  # Fix the biological and technical replicates of a particular condition
+  #
+  # Args:
+  #   biological.replicates:A vector with the biological replicates of a condition
+  #   technical.replicates: A vector with the technical replicates of a condition
+  #
+  # Returns:
+  #
+  
+  # Get the unique biological replicates
+  unique.biological <- unique(biological.replicates)
+  
+  # Initialize the starting bioligical sample id
+  biological.sample.id <- 1
+  
+  # Traverse over the unique biological replicates
+  for (biorep in unique.biological) {
+    
+    # Find the same biological replicates
+    same.samples.biological <- which(biological.replicates == biorep)
+    
+    # Correct the numbering of them
+    biological.replicates[same.samples.biological] <- biological.sample.id
+    
+    # Increase the numbering by 1
+    biological.sample.id <- biological.sample.id + 1
+    
+    # Now get the unique technical replicates for a 
+    # particular biological replicate
+    unique.technical <- unique(technical.replicates[same.samples.biological])
+    
+    # Initialize the starting technical sample id
+    technical.sample.id <- 1
+    
+    # Traverse though the unique technical replicates for a particular
+    # biological replicate
+    for (techrep in unique.technical) {
+      
+      # Find the technical replicates sharing the same technical replicate numbering
+      same.samples.technical <- which(technical.replicates == techrep &
+                                        biological.replicates == biological.sample.id - 1)
+      
+      # Correct their numbering
+      technical.replicates[same.samples.technical] <- technical.sample.id
+      
+      # Increase the numbering by 1
+      technical.sample.id <- technical.sample.id +1
+    }
+  }
+  
+  # Finally make the list of the corrected vectors
+  fixed.replicates <- list(biological.replicates, technical.replicates)
+  names(fixed.replicates) <- c("biological", "technical")
+  return (fixed.replicates)
+}
+
+fix.replicates.per.condition <- function (replicates.per.condition, replicates.status.per.condition) {
+  #
+  # Fixes the bad replicates of replicates.per.condition
+  #
+  # Args:
+  #   replicates.per.condition: A list of lists where each element corresponds
+  #   corresponds to a conditions and it contains 2 vectors regarding the
+  #   biological/technical replicates IDs
+  #
+  #   replicates.status.per.condition: A list of lists where each element 
+  #   corresponds to a conditions and it contains 2 booleans regarding 
+  #   the correctness of the biological/technical replicates for this
+  #   conditions.
+  #
+  # Returns:
+  #   replicates.per.condition: The corrected replicates.per.condition
+  #   vector with the correct numbering of biological/technical
+  #   replicates
+  #
+  
+  # Traverse over replicates per condition
+  for (index in 1:length(replicates.status.per.condition)) {
+    condition <- names(replicates.status.per.condition)[index]
+    biological.status <- replicates.status.per.condition[[index]]$biological
+    technical.status  <- replicates.status.per.condition[[index]]$technical
+    
+    # Make a code using the biological/technical replicates status
+    # for faster comparison than if/else
+    case <- (biological.status * 2  + technical.status * 1) + 1
+    
+    switch(case,
+           cat("Condition", condition, "has bad biological and technical replicates.\n") ,
+           cat("Condition", condition, "has bad biological replicates.\n") ,
+           cat("Condition", condition, "has bad technical replicates.\n") ,
+           cat("Condition", condition, "has good replicates.\n"))
+    
+    # If replicates are not good
+    if (case != 4) {
+      cat("Fixing condition ", condition," ...\n")
+      
+      # Get the biological/technical replicates vector for a particural
+      # to be fixed
+      biological.replicates <- replicates.per.condition[[index]]$biological
+      technical.replicates <- replicates.per.condition[[index]]$technical
+      
+      # Now fix the bad replicates
+      fixed.replicates <- fix.replicates(biological.replicates,
+                                         technical.replicates)
+      
+      # Finally repair the replicates pern condition list with the 
+      # corrected vectors
+      replicates.per.condition[[index]] <- fixed.replicates
+    }
+  }
+  return (replicates.per.condition)
 }

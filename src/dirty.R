@@ -9,6 +9,7 @@
 # library(data.table)
 # library(feather)
 
+# Moved to functions_build.R
 # replicates.per.condition <- function(biological.replicates, technical.replicates, conditions) {
 #   
 #   replicates.per.condition <- list()
@@ -30,42 +31,44 @@
 #   return (replicates.per.condition)
 # }
 
-replicates.status.per.condition <- function(replicates.per.condition) {
-  
-  replicates.status.per.condition <- list()
-  for (condition in replicates.per.condition) {
-    biological.replicates <- condition[[1]]
-    technical.replicates <- condition[[2]]
-    
-    new.status <- check.replicates(biological.replicates,
-                                   technical.replicates)
-    
-    if (length(replicates.status.per.condition) == 0) {
-      replicates.status.per.condition <- new.status
-    } else {
-      replicates.status.per.condition <- list(replicates.status.per.condition, new.status)
-    }
-  }
-  names(replicates.status.per.condition) <- names(replicates.per.condition)
-  return (replicates.status.per.condition)
-}
+# Moved to functions_build.R
+# replicates.status.per.condition <- function(replicates.per.condition) {
+#   
+#   replicates.status.per.condition <- list()
+#   for (condition in replicates.per.condition) {
+#     biological.replicates <- condition[[1]]
+#     technical.replicates <- condition[[2]]
+#     
+#     new.status <- check.replicates(biological.replicates,
+#                                    technical.replicates)
+#     
+#     if (length(replicates.status.per.condition) == 0) {
+#       replicates.status.per.condition <- new.status
+#     } else {
+#       replicates.status.per.condition <- list(replicates.status.per.condition, new.status)
+#     }
+#   }
+#   names(replicates.status.per.condition) <- names(replicates.per.condition)
+#   return (replicates.status.per.condition)
+# }
 
-check.replicates <- function(biological.replicates, technical.replicates) {
-  
-  unique.biological.replicates <-  unique(biological.replicates)
-  unique.technical.replicates <-  sort(unique(technical.replicates))
-  
-  expected.biological.replicates <- c(1:length(unique.biological.replicates))
-  expected.technical.replicates <- c(1:length(unique.technical.replicates))
-  
-  biological.replicates.are.ok <- all(unique.biological.replicates == expected.biological.replicates)
-  technical.replicates.are.ok <- all(unique.technical.replicates == expected.technical.replicates)
-  
-  replicates.status <- list( "biological" = biological.replicates.are.ok,
-                             "technical" = technical.replicates.are.ok)
-  
-  return (replicates.status)
-}
+# Moved to functions_build.R
+# check.replicates <- function(biological.replicates, technical.replicates) {
+#   
+#   unique.biological.replicates <-  unique(biological.replicates)
+#   unique.technical.replicates <-  sort(unique(technical.replicates))
+#   
+#   expected.biological.replicates <- c(1:length(unique.biological.replicates))
+#   expected.technical.replicates <- c(1:length(unique.technical.replicates))
+#   
+#   biological.replicates.are.ok <- all(unique.biological.replicates == expected.biological.replicates)
+#   technical.replicates.are.ok <- all(unique.technical.replicates == expected.technical.replicates)
+#   
+#   replicates.status <- list( "biological" = biological.replicates.are.ok,
+#                              "technical" = technical.replicates.are.ok)
+#   
+#   return (replicates.status)
+# }
 
 fix.replicates <- function(biological.replicates, technical.replicates) {
   
@@ -959,34 +962,34 @@ perform_analysis <- function() {
   
   # Added to load_data_R
   # experimental.structure <- read.csv("~/experimental-structure.csv")
-  
-  experimental.structure <- experimental.structure[
-    order(experimental.structure$conditions,
-          experimental.structure$biorep,
-          experimental.structure$techrep,
-          experimental.structure$fractions),
-    ]
-  
-  rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
-  
-  biological.replicates.list <- experimental.structure$biorep
-  technical.replicates.list <- experimental.structure$techrep
-  experimental.fraction.list <- experimental.structure$fraction
-  experimental.conditions.list <- experimental.structure$condition
-  
-  biological.replicates.number.status <- check.number.of.replicates(replicate.multiplexing.is.used, biological.replicates.list)
-  
-  if (biological.replicates.number.status  == FALSE) {
-    cat("Error User: Cannot accept dataset with just one biological replicate. Aborting ...\n")
-    return (FALSE)
-  }
-  
-  replicates.per.condition <- replicates.per.condition(biological.replicates.list,
-                                                       technical.replicates.list,
-                                                       experimental.conditions.list)
-  
-  replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
-  
+  # 
+  # experimental.structure <- experimental.structure[
+  #   order(experimental.structure$conditions,
+  #         experimental.structure$biorep,
+  #         experimental.structure$techrep,
+  #         experimental.structure$fractions),
+  #   ]
+  # 
+  # rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
+  # 
+  # biological.replicates.list <- experimental.structure$biorep
+  # technical.replicates.list <- experimental.structure$techrep
+  # experimental.fraction.list <- experimental.structure$fraction
+  # experimental.conditions.list <- experimental.structure$condition
+  # 
+  # biological.replicates.number.status <- check.number.of.replicates(replicate.multiplexing.is.used, biological.replicates.list)
+  # 
+  # if (biological.replicates.number.status  == FALSE) {
+  #   cat("Error User: Cannot accept dataset with just one biological replicate. Aborting ...\n")
+  #   return (FALSE)
+  # }
+  # 
+  # replicates.per.condition <- replicates.per.condition(biological.replicates.list,
+  #                                                      technical.replicates.list,
+  #                                                      experimental.conditions.list)
+  # 
+  # replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
+  # 
   
   fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
                                                                  replicates.status.per.condition)
