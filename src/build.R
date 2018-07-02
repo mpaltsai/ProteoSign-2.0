@@ -47,10 +47,11 @@ replicates.per.condition <- replicates.per.condition(biological.replicates.list,
 # with booleans regarding the correctness of biological and technical replicates
 replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
 
-
+# Find the problematic replicates and fix them
 fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
                                                                replicates.status.per.condition)
 
+# Reset the with the corrected replicates
 replicates.per.condition <- fixed.replicates.per.condition
 
 restored.replicates <- restore.replicates(replicates.per.condition)

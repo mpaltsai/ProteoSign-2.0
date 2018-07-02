@@ -69,55 +69,56 @@
 #   
 #   return (replicates.status)
 # }
-
-fix.replicates <- function(biological.replicates, technical.replicates) {
-  
-  unique.biological <- unique(biological.replicates)
-  biological.sample.id <- 1
-  for (biorep in unique.biological) {
-    
-    same.samples.biological <- which(biological.replicates == biorep)
-    biological.replicates[same.samples.biological] <- biological.sample.id
-    biological.sample.id <- biological.sample.id + 1
-    unique.technical <- unique(technical.replicates[same.samples.biological])
-    technical.sample.id <- 1
-    
-    for (techrep in unique.technical) {
-      same.samples.technical <- which(technical.replicates == techrep & biological.replicates == biological.sample.id - 1)
-      technical.replicates[same.samples.technical] <- technical.sample.id
-      technical.sample.id <- technical.sample.id +1
-    }
-  }
-  fixed.replicates <- list(biological.replicates, technical.replicates)
-  names(fixed.replicates) <- c("biological", "technical")
-  return (fixed.replicates)
-}
-
-fix.replicates.per.condition <- function (replicates.per.condition, replicates.status.per.condition) {
-  
-  biological.replicate.id <- 1
-  
-  for (index in 1:length(replicates.status.per.condition)) {
-    condition <- names(replicates.status.per.condition)[index]
-    biological.status <- replicates.status.per.condition[[index]]$biological
-    technical.status  <- replicates.status.per.condition[[index]]$technical
-    
-    case <- (biological.status * 2  + technical.status * 1) + 1
-    switch(case,
-           cat("Condition", condition, "has bad biological and technical replicates.\n") ,
-           cat("Condition", condition, "has bad biological replicates.\n") ,
-           cat("Condition", condition, "has bad technical replicates.\n") ,
-           cat("Condition", condition, "has good replicates.\n"))
-    if (case != 4) {
-      cat("Fixing...\n")
-      biological.replicates <- replicates.per.condition[[index]]$biological
-      technical.replicates <- replicates.per.condition[[index]]$technical
-      fixed.replicates <- fix.replicates(biological.replicates, technical.replicates)
-      replicates.per.condition[[index]] <- fixed.replicates
-    }
-  }
-  return (replicates.per.condition)
-}
+# 
+# Moved to functions_build.R
+# fix.replicates <- function(biological.replicates, technical.replicates) {
+#   
+#   unique.biological <- unique(biological.replicates)
+#   biological.sample.id <- 1
+#   for (biorep in unique.biological) {
+#     
+#     same.samples.biological <- which(biological.replicates == biorep)
+#     biological.replicates[same.samples.biological] <- biological.sample.id
+#     biological.sample.id <- biological.sample.id + 1
+#     unique.technical <- unique(technical.replicates[same.samples.biological])
+#     technical.sample.id <- 1
+#     
+#     for (techrep in unique.technical) {
+#       same.samples.technical <- which(technical.replicates == techrep & biological.replicates == biological.sample.id - 1)
+#       technical.replicates[same.samples.technical] <- technical.sample.id
+#       technical.sample.id <- technical.sample.id +1
+#     }
+#   }
+#   fixed.replicates <- list(biological.replicates, technical.replicates)
+#   names(fixed.replicates) <- c("biological", "technical")
+#   return (fixed.replicates)
+# }
+# 
+# fix.replicates.per.condition <- function (replicates.per.condition, replicates.status.per.condition) {
+#   
+#   biological.replicate.id <- 1
+#   
+#   for (index in 1:length(replicates.status.per.condition)) {
+#     condition <- names(replicates.status.per.condition)[index]
+#     biological.status <- replicates.status.per.condition[[index]]$biological
+#     technical.status  <- replicates.status.per.condition[[index]]$technical
+#     
+#     case <- (biological.status * 2  + technical.status * 1) + 1
+#     switch(case,
+#            cat("Condition", condition, "has bad biological and technical replicates.\n") ,
+#            cat("Condition", condition, "has bad biological replicates.\n") ,
+#            cat("Condition", condition, "has bad technical replicates.\n") ,
+#            cat("Condition", condition, "has good replicates.\n"))
+#     if (case != 4) {
+#       cat("Fixing...\n")
+#       biological.replicates <- replicates.per.condition[[index]]$biological
+#       technical.replicates <- replicates.per.condition[[index]]$technical
+#       fixed.replicates <- fix.replicates(biological.replicates, technical.replicates)
+#       replicates.per.condition[[index]] <- fixed.replicates
+#     }
+#   }
+#   return (replicates.per.condition)
+# }
 
 restore.replicates <- function(replicates.per.condition) {
   biological <- c()

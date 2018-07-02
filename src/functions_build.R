@@ -162,6 +162,7 @@ fix.replicates <- function(biological.replicates, technical.replicates) {
   #   technical.replicates: A vector with the technical replicates of a condition
   #
   # Returns:
+  #   A list with the corrected biological/technical replicates vectors
   #
   
   # Get the unique biological replicates
