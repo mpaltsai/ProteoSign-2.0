@@ -54,12 +54,59 @@ fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.co
 # Reset the with the corrected replicates
 replicates.per.condition <- fixed.replicates.per.condition
 
+# Make a list with the corrected replicates concatenated
 restored.replicates <- restore.replicates(replicates.per.condition)
 
+# Restore the biological replicates list
 biological.replicates.list <- restored.replicates$biological
 
+# Restore the technical replicates list
 technical.replicates.list <- restored.replicates$technical
 
+# Restore the biological column on the experimenta structure file
 experimental.structure$biorep <- biological.replicates.list
 
+# Restore the technical column on the experimenta structure file
 experimental.structure$techrep <- technical.replicates.list
+
+# TODO If bioreps and techreps are changed inform the user!
+
+# Now exploit the check.number.of.replicates to find if there are
+# replicates of each type in our experiment and construct the setup id
+# ID = 1: We have only biological replicates 
+# ID = 2: Illegal state! We cannot have only technical replicates...
+# ID = 3: We have biological and technical replicates
+# ID = 4: We have biological replicates and fractions
+# ID = 5: Illegal state! There are no biological replicates...
+# ID = 6: We have biological and technical replicates as well as fractions
+# TODO ensure that this works with replicate multiplexing too,
+# and if yes  then maybe the ID 5 is then correct?
+experimental.setup.id <-  1 * check.number.of.replicates(replicates.multiplexing,
+                                                         biological.replicates.list) +
+                          
+                          2 * check.number.of.replicates(replicates.multiplexing,
+                                                         technical.replicates.list) +
+                          
+                          3 * check.number.of.replicates(replicates.multiplexing,
+                                                         experimental.fraction.list)
+
+experimental.description <- make.experimental.description(experimental.setup.id,
+                                                          biological.replicates.list,
+                                                          technical.replicates.list,
+                                                          experimental.fraction.list)
+
+# Add a description column to the experimental structure matrix
+experimental.structure$description <- experimental.description
+
+# Update the global variable and turn in to data.table
+experimental.structure <- data.table(experimental.structure)
+global.variables[["experimental.structure"]] <- experimental.structure
+
+# Store max biological replicates for duplicates handling from limma
+global.variables[["max.biological.replicates"]] <- experimental.structure[,
+                                                                          which.max(biological)]
+
+# Turn experimental structure to data.table
+global.variables[["min.technical.replicates"]] <- min(data[,
+                                                           .SD[which.max(technical)],
+                                                           by=biological]$technical)

@@ -268,3 +268,96 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
   }
   return (replicates.per.condition)
 }
+
+restore.replicates <- function(replicates.per.condition) {
+  #
+  # Creates a list containing 2 vectors in roder to restore the initial
+  # experimental dataset columns with the correct biological/technical
+  # replicate vectors.
+  #
+  # Args:
+  #   replicates.per.condition: A list of lists where each list element
+  #   corresponds to a condition and its biological/technical replicates
+  #   numbering.
+  #
+  # Returns:
+  #   A list with 2 vectors containing the corrected biological/technical
+  #   replicates vector
+  #
+  
+  # Create the new vectors
+  biological <- c()
+  technical <- c()
+  
+  # Iterate over the conditions
+  for (rep in replicates.per.condition) {
+    
+    # Add the biological/technical replicates of each condition to the vector
+    biological <- c(biological, rep$biological)
+    technical <- c(technical, rep$technical)
+  }
+  # Finally wrap them in a list
+  restored.replicates <- list("biological" = biological, "technical" = technical)
+  return (restored.replicates)
+}
+
+make.experimental.description <- function(experimental.setup.id, biological.replicates, technical.replicates, fractions) {
+  #
+  # Creates a vector with the experimental description of each sample
+  # as the concatenation of BXTYFZ where XYZ are IDs for the biological/
+  # technical/fraction
+  # 
+  # Args:
+  #   experimental.setup.id:  An id indicating the experimental setup type
+  #   biological.replicates:  A vector with the biological replicates 
+  #   technical.replicates:   A vector with the technical replicates
+  #   fractions:              A vector with the fractions
+  #
+  # Returns:
+  #   A vector with the experimental description
+  #
+  
+  # Make the empty description vector
+  experimental.description <- c()
+  
+  # Paste B,T,F to each biological/technical/fractions vector
+  experimental.description.biological <-  paste0("B", biological.replicates)
+  experimental.description.technical <-   paste0("T", technical.replicates)
+  experimental.description.fractions <-   paste0("F", fractions)
+  
+  # And pasted the appropriate columns based on the experimental id
+  switch(experimental.setup.id,
+         {
+           cat("We have bioreps.\n")
+           experimental.description <- experimental.description.biological
+         },
+         {
+           cat("No bioreps, no fractions? Really? \n")
+           cat("Invalid experimental description id in make.experimental.description function.\n")  
+           return (FALSE)
+         },
+         {
+           cat("We have bioreps and techreps.\n")
+           experimental.description <- paste0(experimental.description.biological,
+                                              experimental.description.technical)
+         },
+         {
+           cat("We have bioreps and fractions.\n")
+           experimental.description <- paste0(experimental.description.biological,
+                                              experimental.description.fractions)
+         },
+         {
+           cat("No bioreps? Really?\n")
+           cat("Invalid experimental description id in make.experimental.description function.\n")  
+           return (FALSE)
+         },
+         {
+           cat("We have bioreps, techreps and fractions.\n")
+           experimental.description <- paste0(experimental.description.biological,
+                                              experimental.description.technical,
+                                              experimental.description.fractions)
+         })
+  cat(experimental.description,"\n")
+  return (experimental.description)
+}
+

@@ -119,17 +119,17 @@
 #   }
 #   return (replicates.per.condition)
 # }
-
-restore.replicates <- function(replicates.per.condition) {
-  biological <- c()
-  technical <- c()
-  for (rep in replicates.per.condition) {
-    biological <- c(biological, rep$biological)
-    technical <- c(technical, rep$technical)
-  }
-  restored.replicates <- list("biological" = biological, "technical" = technical)
-  return (restored.replicates)
-}
+# Moved to functions_build.R
+# restore.replicates <- function(replicates.per.condition) {
+#   biological <- c()
+#   technical <- c()
+#   for (rep in replicates.per.condition) {
+#     biological <- c(biological, rep$biological)
+#     technical <- c(technical, rep$technical)
+#   }
+#   restored.replicates <- list("biological" = biological, "technical" = technical)
+#   return (restored.replicates)
+# }
 
 # Moved to functions_build.R
 # check.replicates.number <- function(replicate.multiplexing.is.used, replicates) {
@@ -140,46 +140,46 @@ restore.replicates <- function(replicates.per.condition) {
 #     return (TRUE)
 #   }
 # }
-
-make.experimental.description <- function(experimental.setup.id, biological.replicates, technical.replicates, fractions) {
-  experimental.description <- c()
-  experimental.description.biological <- paste0("b", biological.replicates)
-  experimental.description.technical <- paste0("t", technical.replicates)
-  experimental.description.fractions <- paste0("f", fractions)
-  switch(experimental.setup.id,
-         {
-           cat("We have bioreps.\n")
-           experimental.description <- experimental.description.biological
-         },
-         {
-           cat("No bioreps, no fractions? Really? \n")
-           cat("Invalid experimental description id in make.experimental.description function.\n")  
-           return (FALSE)
-         },
-         {
-           cat("We have bioreps and techreps.\n")
-           experimental.description <- paste0(experimental.description.biological,
-                                              experimental.description.technical)
-         },
-         {
-           cat("We have bioreps and fractions.\n")
-           experimental.description <- paste0(experimental.description.biological,
-                                              experimental.description.fractions)
-         },
-         {
-           cat("No bioreps? Really?\n")
-           cat("Invalid experimental description id in make.experimental.description function.\n")  
-           return (FALSE)
-         },
-         {
-           cat("We have bioreps, techreps and fractions.\n")
-           experimental.description <- paste0(experimental.description.biological,
-                                              experimental.description.technical,
-                                              experimental.description.fractions)
-         })
-  cat(experimental.description,"\n")
-  return (experimental.description)
-}
+# Moved to functions_build.R
+# make.experimental.description <- function(experimental.setup.id, biological.replicates, technical.replicates, fractions) {
+#   experimental.description <- c()
+#   experimental.description.biological <- paste0("b", biological.replicates)
+#   experimental.description.technical <- paste0("t", technical.replicates)
+#   experimental.description.fractions <- paste0("f", fractions)
+#   switch(experimental.setup.id,
+#          {
+#            cat("We have bioreps.\n")
+#            experimental.description <- experimental.description.biological
+#          },
+#          {
+#            cat("No bioreps, no fractions? Really? \n")
+#            cat("Invalid experimental description id in make.experimental.description function.\n")  
+#            return (FALSE)
+#          },
+#          {
+#            cat("We have bioreps and techreps.\n")
+#            experimental.description <- paste0(experimental.description.biological,
+#                                               experimental.description.technical)
+#          },
+#          {
+#            cat("We have bioreps and fractions.\n")
+#            experimental.description <- paste0(experimental.description.biological,
+#                                               experimental.description.fractions)
+#          },
+#          {
+#            cat("No bioreps? Really?\n")
+#            cat("Invalid experimental description id in make.experimental.description function.\n")  
+#            return (FALSE)
+#          },
+#          {
+#            cat("We have bioreps, techreps and fractions.\n")
+#            experimental.description <- paste0(experimental.description.biological,
+#                                               experimental.description.technical,
+#                                               experimental.description.fractions)
+#          })
+#   cat(experimental.description,"\n")
+#   return (experimental.description)
+# }
 
 clean.file.from.quotes <- function(file.name) {
   file.first.line <- readLines(file.name, n=1)
@@ -991,47 +991,49 @@ perform_analysis <- function() {
   # 
   # replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
   # 
-  
-  fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
-                                                                 replicates.status.per.condition)
-  
-  replicates.per.condition <- fixed.replicates.per.condition
-  
-  restored.replicates <- restore.replicates(replicates.per.condition)
-  
-  biological.replicates.list <- restored.replicates$biological
-  
-  technical.replicates.list <- restored.replicates$technical
-  
-  experimental.structure$biorep <- biological.replicates.list
-  
-  experimental.structure$techrep <- technical.replicates.list
-  
-  
-  # ##### Maybe later for condition fix ######
-  # fixed.labels <- conditions.labels
   # 
-  # bad.labels.index <- which(grepl("^(?!cond).*$", fixed.labels, perl = TRUE))
+  # fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
+  #                                                                replicates.status.per.condition)
   # 
-  # fixed.labels[bad.labels.index] <- paste0("cond", "N") 
+  # replicates.per.condition <- fixed.replicates.per.condition
   # 
-  # #################################
+  # restored.replicates <- restore.replicates(replicates.per.condition)
+  # 
+  # biological.replicates.list <- restored.replicates$biological
+  # 
+  # technical.replicates.list <- restored.replicates$technical
+  # 
+  # experimental.structure$biorep <- biological.replicates.list
+  # 
+  # experimental.structure$techrep <- technical.replicates.list
+  # 
   
-  # ## Why?
-  original_rep_structure$rep_desc<-paste(paste(paste("b",original_rep_structure$biorep,sep=""),"t",original_rep_structure$techrep,sep=""))
-  # ###
+  # TODO Maybe later for condition fix
+  fixed.labels <- conditions.labels
+
+  bad.labels.index <- which(grepl("^(?!cond).*$", fixed.labels, perl = TRUE))
+
+  fixed.labels[bad.labels.index] <- paste0("cond", "N")
+
+  # TODOEND
   
-  experimental.setup.id <-  1 * check.number.of.replicates(FALSE, biological.replicates.list) +
-    2 * check.number.of.replicates(FALSE, technical.replicates.list) +
-    3 * check.number.of.replicates(FALSE, experimental.fraction.list)
-  
-  experimental.description <- make.experimental.description(experimental.setup.id,
-                                                            biological.replicates.list,
-                                                            technical.replicates.list,
-                                                            experimental.fraction.list)
-  
-  experimental.structure$description <- experimental.description
-  clean.workspace()
+  # Made it my own way
+  # original_rep_structure$rep_desc<-paste(paste(paste("b",original_rep_structure$biorep,sep=""),"t",original_rep_structure$techrep,sep=""))
+  # 
+  # Moved to build.R 
+  # experimental.setup.id <-  1 * check.number.of.replicates(FALSE, biological.replicates.list) +
+  #   2 * check.number.of.replicates(FALSE, technical.replicates.list) +
+  #   3 * check.number.of.replicates(FALSE, experimental.fraction.list)
+  # 
+  # experimental.description <- make.experimental.description(experimental.setup.id,
+  #                                                           biological.replicates.list,
+  #                                                           technical.replicates.list,
+  #                                                           experimental.fraction.list)
+  # 
+  # experimental.structure$description <- experimental.description
+  # 
+  # Removed
+  # clean.workspace()
   
   # ### Huh?
   .GlobalEnv[["rep_structure"]]<-rep_structure
@@ -1168,20 +1170,21 @@ do.logging <- function(message, level){
   levellog(logger, level, message)
 }
 
-clean.workspace <- function() {
-  variables <- c("biological.replicates.number.status",
-                 "fixed.replicates.per.condition",
-                 "replicates.status.per.condition",
-                 "restored.replicates",
-                 "experimental.setup.id")
-  
-  functions <- c("check.number.of.replicates",
-                 "check.replicates",
-                 "fix.replicates",
-                 "fix.replicates.per.condition",
-                 "make.experimental.description",
-                 "restore.replicates")
-  r.objects <- c(variables, functions)
-  suppressWarnings(remove(list = r.objects, envir = globalenv()))
-}
+# Used the global.variable for cleaning purposes
+# clean.workspace <- function() {
+#   variables <- c("biological.replicates.number.status",
+#                  "fixed.replicates.per.condition",
+#                  "replicates.status.per.condition",
+#                  "restored.replicates",
+#                  "experimental.setup.id")
+#   
+#   functions <- c("check.number.of.replicates",
+#                  "check.replicates",
+#                  "fix.replicates",
+#                  "fix.replicates.per.condition",
+#                  "make.experimental.description",
+#                  "restore.replicates")
+#   r.objects <- c(variables, functions)
+#   suppressWarnings(remove(list = r.objects, envir = globalenv()))
+# }
 
