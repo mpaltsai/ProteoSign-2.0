@@ -5,7 +5,7 @@
 rm(list = grep("^global.variables", ls(), value = TRUE, invert = TRUE))
 
 global.variables <- list("development.stage" = TRUE,
-                         "protein.quantitation" = TRUE,
+                         "quantitation.type" = "Proteins",
                          "replicate.multiplexing.is.used" = FALSE,
                          "is.proteome.discoverer.data" = FALSE)
 

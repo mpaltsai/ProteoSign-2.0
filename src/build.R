@@ -98,15 +98,20 @@ experimental.description <- make.experimental.description(experimental.setup.id,
 # Add a description column to the experimental structure matrix
 experimental.structure$description <- experimental.description
 
-# Update the global variable and turn in to data.table
+# Turn experimental structure into a data.table
 experimental.structure <- data.table(experimental.structure)
+
+# Update the experimental.structure global variable 
 global.variables[["experimental.structure"]] <- experimental.structure
 
 # Store max biological replicates for duplicates handling from limma
 global.variables[["max.biological.replicates"]] <- experimental.structure[,
                                                                           which.max(biological)]
 
-# Turn experimental structure to data.table
+# Store the minimum number of technical replicates
 global.variables[["min.technical.replicates"]] <- min(data[,
                                                            .SD[which.max(technical)],
-                                                           by=biological]$technical)
+                                                           by = biological]$technical)
+
+# Clean evidence data from quotes
+global.variables[["evidence.data"]] <- clean.file.from.quotes(global.variables[["evidence.data"]])

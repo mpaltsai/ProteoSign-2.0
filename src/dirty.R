@@ -218,10 +218,12 @@ find.proteome.discoverer.protein.column <- function(evidence.data) {
 }
 
 correct.maxquant.protein.groups <- function(protein.groups.data, evidence.data) {
-  ## For MaxQuant correct protein groups in the evidence file using the protein groups file.
+  ## For MaxQuant correct protein groups in the evidence file using the
+  # protein groups file.
   # protein.groups.data <- fread(protein.groups.file, integer64 = "numeric")
   # print(length(protein.groups.data$`Peptide counts (all)`))
-  # If there isn't a Protein.Names or Protein.names column (depends on MQ version), create one from the Fasta Headers column
+  # If there isn't a Protein.Names or Protein.names column
+  # (depends on MQ version), create one from the Fasta Headers column
   protein.groups.column.names <- colnames(protein.groups.data)
   evidence.column.names <- colnames(evidence.data)
   
@@ -331,8 +333,9 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
     evidence.data <- corrected.files$evidence.file
   }
   
-  #In the case of Isobaric labeling we should reformat the table before proceeding, afterwards we will treat the data as
-  #if they were label-free data
+  # In the case of Isobaric labeling we should reformat the table before
+  # proceeding, afterwards we will treat the data as
+  # if they were label-free data
   
   analysis.parameters <- list("dataset.source" = "Maxquant",
                               "is.isobaric" = FALSE,
@@ -409,7 +412,7 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   } else {
     protein.groups.column <- "Protein Names"
   }
-  #### Shady part, maybe errors, bugs, accidental domen summonning
+  #### Shady part, maybe errors, bugs, accidental demon summonning
   #### Maybe duplicate of Maxquant block
   
   tmp.table <- evidence.data[, .SD, .SDcols = c("Protein IDs", protein.groups.column)]
@@ -463,10 +466,13 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   
   if(replicate.multiplexing.is.used == TRUE){
     levellog("read.protein.groups.data_v3: Transforming data for Replication Multiplexing ...")
-    #when RM is chosen, in this line evidence has two main columns, one called Labeling.State or Modifications
+    #when RM is chosen, in this line evidence
+    #has two main columns, one called Labeling.State or Modifications
     #that tells us what tag it was tagged and one called 
-    #Spectrum File or Raw File that says from which raw file did the psm come from
-    #in case of RM breps treps and conditions may come from either raw files or tags but in this data format creating
+    #Spectrum File or Raw File that says from which raw file did 
+    #the psm come from
+    #in case of RM breps treps and conditions may come from 
+    # either raw files or tags but in this data format creating
     #two new columns describing the structure correctly is not difficult
     #first create the column for conditions
     RMrawfilesdata <- RMrawfilesdata[!RMrawfilesdata$used == 'false',]
@@ -737,7 +743,8 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   write.table(tmp.table[, .(n=.N), by=.(Protein.IDs,rep=biorep)][,.(Protein.IDs,rep)],file=paste0(outputFigsPrefix,"_id_venn3-data_",time.point,".txt"),sep="\t",row.names=F)
   setwd("..")    
   
-  # Bring Labeled or Label-free data to the following common format (table headers):
+  # Bring Labeled or Label-free data to the following common format
+  # (table headers):
   # rep_desc Protein.IDs UniqueSequences.Intensity.condition_1 ... UniqueSequences.Intensity.condition_N Intensity.condition_1 ... Intensity.condition_N
   
   levellog("read.protein.groups.data_v3: Standarizing data format ...")
@@ -1036,21 +1043,21 @@ perform_analysis <- function() {
   # clean.workspace()
   
   # ### Huh?
-  .GlobalEnv[["rep_structure"]]<-rep_structure
-  .GlobalEnv[["LFQ_conds"]]<-LFQ_conds
-  .GlobalEnv[["original_rep_structure"]]<-original_rep_structure
-  .GlobalEnv[["n_bioreps"]]<-max(rep_structure$biorep)
-  .GlobalEnv[["n_techreps"]] <- min(
-    ddply(rep_structure[,c("biorep","techrep")],
-          c("biorep"),
-          function(x){
-            return(max(x$techrep))
-          })$V1)
+  # .GlobalEnv[["rep_structure"]]<-rep_structure
+  # .GlobalEnv[["LFQ_conds"]]<-LFQ_conds
+  # .GlobalEnv[["original_rep_structure"]]<-original_rep_structure
+  # .GlobalEnv[["n_bioreps"]]<-max(rep_structure$biorep)
+  # .GlobalEnv[["n_techreps"]] <- min(
+  #   ddply(rep_structure[,c("biorep","techrep")],
+  #         c("biorep"),
+  #         function(x){
+  #           return(max(x$techrep))
+  #         })$V1)
   
   # ###
   
   ##########################  DIRTY ######################################
-  
+  # Should be setted on initialize.R  
   if (ProteinQuantitation == TRUE) {
     quantitation.status <- "Protein"
   } else {

@@ -361,3 +361,41 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
   return (experimental.description)
 }
 
+clean.file.from.quotes <- function(file) {
+  #
+  # Cleans a file from quotes
+  #
+  # Args:
+  #   file.name: The name of the file to be cleaned
+  #
+  # Returns:
+  #   A data.table of the cleaned file or false
+  #
+  
+  # Read only the first line for testing purposes
+  file.first.line <- file[1, ]
+  
+  # And see if it does have quotes
+  data.have.quotes <- grepl("\"|\'", file.first.line)
+  colnames.have.quotes <- grepl("\"|\'", colnames(file))
+  
+  cat('Reading', file.name, '...\n')
+  
+  # If yes, remove them from file, otherwise return initial data
+  if (data.have.quotes == TRUE | colnames.have.quotes == TRUE) {
+    
+    cat("Removing double quotes from input data file", file.name, "...\n")
+    
+    print(typeof(input.data))
+    # Too slow, do i need it?
+    #cleaned.data <- gsub("\"", "", input.data)
+    
+    # evidence.file_cleaned <- file(evidence.file, open="w")
+    # writeLines(tmpdata, con=evidence.file_cleaned)
+    # close(evidence.file_cleaned)
+  } else {
+    cat("File is empty from quotes!\n")
+    cleaned.data <- input.data
+  }
+  return (cleaned.data)
+}
