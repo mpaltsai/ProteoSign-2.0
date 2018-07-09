@@ -2,48 +2,45 @@
 # workspace, loads the functions.R script and sets the global variables.
 
 # Clear enviroment
-rm(list = grep("^global.variables", ls(), value = TRUE, invert = TRUE))
+rm(list = grep("^project.variables|^check.packages", ls(), value = TRUE, invert = TRUE))
 
-global.variables <- list("development.stage" = TRUE,
-                         "quantitation.type" = "Proteins",
+global.variables <- list("quantitation.type" = "Proteins",
                          "replicate.multiplexing.is.used" = FALSE,
-                         "is.proteome.discoverer.data" = FALSE)
-
-check.packages <- function(packages) {
-  # Checks to see if desired packages are installed and if they are not, it installs them.
-  # Args:
-  #   package: A vector of the desired packages
-  # Returns:
-  #   TRUE by default
-  #
-  new.packages <- packages[ !(packages %in% installed.packages()[, "Package"])]
-  if ( length(new.packages) )
-    install.packages(new.packages, dependencies = TRUE)
-  return (TRUE)
-}
+                         "dataset.origin" = "MaxQuant")
 
 # Project Packages to be installed
-packages <- c("data.table")
+cran.packages <- c("data.table")
 
 # Add packages used during development only
-if(global.variables[["development.stage"]] == TRUE) {
-  packages <- c(packages, "rbenchmark")
+if(project.variables[["development.stage"]] == TRUE) {
+  cran.packages <- c(cran.packages, "rbenchmark")
+  
+  # Temporary reset current working directory
+  # in order to work packrat package installation
+  setwd(here())
+  
+  # Install missing packages
+  check.packages(cran.packages)
+  
+  # Reset current working
+  setwd(here("src"))
 }
 
-# Temporary reset current working directory
-# in order to work packrat package installation
-setwd(here())
-
-# Install missing packages
-check.packages(packages)
-
-# Reset current working
-setwd(here("src"))
-
 # Load all packages
-invisible(lapply(packages, require, character.only = TRUE))
+invisible(lapply(cran.packages, library, character.only = TRUE))
 
 # Save loaded packages in packrat
-snapshot()
+if (project.variables[["development.stage"]] == TRUE) {
+  
+  # Temporary reset current working directory
+  # in order to work packrat package installation
+  setwd(here())
+  
+  # Snapshot loaded packages
+  snapshot()
+  
+  # Reset current working
+  setwd(here("src"))
+}
 
 source("functions.R")

@@ -61,12 +61,8 @@ replicates.per.condition <- function(biological.replicates, technical.replicates
     new.element <- list("biological" = biological.replicates.per.condition,
                         "technical"= technical.replicates.per.condition)
     
-    # Add put the in the list
-    if (length(replicates.per.condition) == 0 ) {
-      replicates.per.condition <- new.element
-    } else {
-      replicates.per.condition <- list(replicates.per.condition, new.element)
-    }
+    # Add element to list
+    replicates.per.condition[[condition]] <- new.element
   }
   
   # Finally put the conditions names for each element
@@ -132,9 +128,9 @@ replicates.status.per.condition <- function(replicates.per.condition) {
   # Make the list
   replicates.status.per.condition <- list()
   
-  for (condition in replicates.per.condition) {
-    biological.replicates <- condition[[1]]
-    technical.replicates <- condition[[2]]
+  for (index in 1:length(replicates.per.condition)) {
+    biological.replicates <- replicates.per.condition[[index]][[1]]
+    technical.replicates <- replicates.per.condition[[index]][[2]]
     
     # The the correctness of the biological/technical replicates of the 
     # current status
@@ -142,11 +138,7 @@ replicates.status.per.condition <- function(replicates.per.condition) {
                                    technical.replicates)
     
     # Add them to a list
-    if (length(replicates.status.per.condition) == 0) {
-      replicates.status.per.condition <- new.status
-    } else {
-      replicates.status.per.condition <- list(replicates.status.per.condition, new.status)
-    }
+    replicates.status.per.condition[[index]] <- new.status
   }
   # Finally add the condition name
   names(replicates.status.per.condition) <- names(replicates.per.condition)
@@ -361,41 +353,3 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
   return (experimental.description)
 }
 
-clean.file.from.quotes <- function(file) {
-  #
-  # Cleans a file from quotes
-  #
-  # Args:
-  #   file.name: The name of the file to be cleaned
-  #
-  # Returns:
-  #   A data.table of the cleaned file or false
-  #
-  
-  # Read only the first line for testing purposes
-  file.first.line <- file[1, ]
-  
-  # And see if it does have quotes
-  data.have.quotes <- grepl("\"|\'", file.first.line)
-  colnames.have.quotes <- grepl("\"|\'", colnames(file))
-  
-  cat('Reading', file.name, '...\n')
-  
-  # If yes, remove them from file, otherwise return initial data
-  if (data.have.quotes == TRUE | colnames.have.quotes == TRUE) {
-    
-    cat("Removing double quotes from input data file", file.name, "...\n")
-    
-    print(typeof(input.data))
-    # Too slow, do i need it?
-    #cleaned.data <- gsub("\"", "", input.data)
-    
-    # evidence.file_cleaned <- file(evidence.file, open="w")
-    # writeLines(tmpdata, con=evidence.file_cleaned)
-    # close(evidence.file_cleaned)
-  } else {
-    cat("File is empty from quotes!\n")
-    cleaned.data <- input.data
-  }
-  return (cleaned.data)
-}

@@ -2,6 +2,15 @@
 # files in workspace should be displayed. A build boolean variable can be used for
 # data reload from RDS for faster data reload.
 
+# Clear enviroment and only keep functions and global/project variables
+rm(list = grep(paste(c("^global.variables",
+                       "^project.variables",
+                       lsf.str()),
+                     collapse = "|"),
+               ls(),
+               value = TRUE,
+               invert = TRUE))
+
 # Read the experimental structure from the global variables list
 experimental.structure <- global.variables[["experimental.structure"]]
 
@@ -12,18 +21,18 @@ replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
 # /technical replicates/ fractions
 experimental.structure <- experimental.structure[
   order(experimental.structure$conditions,
-        experimental.structure$biorep,
-        experimental.structure$techrep,
-        experimental.structure$fractions),]
+        experimental.structure$biological,
+        experimental.structure$technical,
+        experimental.structure$fractions), ]
 
 # Correct the rownames
 rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
 
 # Store each column on a separate variable
-biological.replicates.list <- experimental.structure$biorep
-technical.replicates.list <- experimental.structure$techrep
-experimental.fraction.list <- experimental.structure$fraction
-experimental.conditions.list <- experimental.structure$condition
+biological.replicates.list <- experimental.structure$biological
+technical.replicates.list <- experimental.structure$technical
+experimental.fraction.list <- experimental.structure$fractions
+experimental.conditions.list <- experimental.structure$conditions
 
 # Do I have more than 1 replicate 
 # but without replicate multiplexing?
@@ -32,9 +41,9 @@ biological.replicates.number.status <- check.replicates.number(replicates.multip
 
 # If not inform user and abort analysis
 if (biological.replicates.number.status  == FALSE) {
-  cat("Error User: Cannot accept dataset with just one biological replicate. Aborting ...\n")
+  stop("Cannot accept dataset with just one biological replicate. Aborting ...\n")
   # TODO Handle the sourcing in order to stop
-  return (FALSE)
+  
 }
 
 # Make a list of list where each element is a condition paired
@@ -81,13 +90,13 @@ experimental.structure$techrep <- technical.replicates.list
 # ID = 6: We have biological and technical replicates as well as fractions
 # TODO ensure that this works with replicate multiplexing too,
 # and if yes  then maybe the ID 5 is then correct?
-experimental.setup.id <-  1 * check.number.of.replicates(replicates.multiplexing,
+experimental.setup.id <-  1 * check.replicates.number(replicates.multiplexing,
                                                          biological.replicates.list) +
                           
-                          2 * check.number.of.replicates(replicates.multiplexing,
+                          2 * check.replicates.number(replicates.multiplexing,
                                                          technical.replicates.list) +
                           
-                          3 * check.number.of.replicates(replicates.multiplexing,
+                          3 * check.replicates.number(replicates.multiplexing,
                                                          experimental.fraction.list)
 
 experimental.description <- make.experimental.description(experimental.setup.id,
@@ -109,9 +118,8 @@ global.variables[["max.biological.replicates"]] <- experimental.structure[,
                                                                           which.max(biological)]
 
 # Store the minimum number of technical replicates
-global.variables[["min.technical.replicates"]] <- min(data[,
+global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(technical)],
                                                            by = biological]$technical)
 
-# Clean evidence data from quotes
-global.variables[["evidence.data"]] <- clean.file.from.quotes(global.variables[["evidence.data"]])
+
