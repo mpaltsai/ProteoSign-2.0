@@ -180,42 +180,42 @@
 #   cat(experimental.description,"\n")
 #   return (experimental.description)
 # }
-
-clean.file.from.quotes <- function(file.name) {
-  file.first.line <- readLines(file.name, n=1)
-  have.quotes <- grepl("\"", file.first.line)
-  cat('Reading', file.name, '...\n')
-  # Moved to load_data.R
-  # input.data <- fread(file.name, integer64 = "numeric")
-  if (have.quotes == TRUE) {
-    cat("Removing double quotes from input data file", file.name, "...\n")
-    
-    print(typeof(input.data))
-    # Too slow, do i need it?
-    #cleaned.data <- gsub("\"", "", input.data)
-    
-    # evidence.file_cleaned <- file(evidence.file, open="w")
-    # writeLines(tmpdata, con=evidence.file_cleaned)
-    # close(evidence.file_cleaned)
-  } else {
-    cat("File is empty from quotes!\n")
-    cleaned.data <- input.data
-  }
-  return (cleaned.data)
-}
-
-find.proteome.discoverer.protein.column <- function(evidence.data) {
-  protein.groups.column <- FALSE
-  if ('Protein.Group.Accessions' %in% colnames(evidence.data) == TRUE) {
-    protein.groups.column<-'Protein.Group.Accessions'
-  } else if ('Protein.Accessions' %in% colnames(evidence.data) == TRUE) {
-    protein.groups.column<-'Protein.Accessions'
-  } else {
-    cat("Error User: The dataset does not contain the columns 'Protein Group Accessions' or 'Protein Accessions'\n")
-  }
-  
-  return (protein.groups.column)
-}
+#  No need for this, used tr unix instead
+# clean.file.from.quotes <- function(file.name) {
+#   file.first.line <- readLines(file.name, n=1)
+#   have.quotes <- grepl("\"", file.first.line)
+#   cat('Reading', file.name, '...\n')
+#   # Moved to load_data.R
+#   # input.data <- fread(file.name, integer64 = "numeric")
+#   if (have.quotes == TRUE) {
+#     cat("Removing double quotes from input data file", file.name, "...\n")
+#     
+#     print(typeof(input.data))
+#     # Too slow, do i need it?
+#     #cleaned.data <- gsub("\"", "", input.data)
+#     
+#     # evidence.file_cleaned <- file(evidence.file, open="w")
+#     # writeLines(tmpdata, con=evidence.file_cleaned)
+#     # close(evidence.file_cleaned)
+#   } else {
+#     cat("File is empty from quotes!\n")
+#     cleaned.data <- input.data
+#   }
+#   return (cleaned.data)
+# }
+# Moved to functions_build.R
+# find.proteome.discoverer.protein.column <- function(evidence.data) {
+#   protein.groups.column <- FALSE
+#   if ('Protein.Group.Accessions' %in% colnames(evidence.data) == TRUE) {
+#     protein.groups.column<-'Protein.Group.Accessions'
+#   } else if ('Protein.Accessions' %in% colnames(evidence.data) == TRUE) {
+#     protein.groups.column<-'Protein.Accessions'
+#   } else {
+#     cat("Error User: The dataset does not contain the columns 'Protein Group Accessions' or 'Protein Accessions'\n")
+#   }
+#   
+#   return (protein.groups.column)
+# }
 
 correct.maxquant.protein.groups <- function(protein.groups.data, evidence.data) {
   ## For MaxQuant correct protein groups in the evidence file using the
@@ -308,23 +308,23 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
                                         is.proteome.discoverer.data) {
   # Moved to load_data.R
   # cat("Reading data file...\n")
-  protein.groups.column <- ""
-  
-  evidence.data <- clean.file.from.quotes(evidence.file)
-  protein.groups.data <- NULL
-  if (is.proteome.discoverer.data == TRUE) {
-    cat('Proteome Discoverer data...\n')
-    protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
-  } else {
-    cat('Maxquant data...\n')
-    cleaned.protein.groups.data <- clean.file.from.quotes(protein.groups.file)
-    protein.groups.data <- cleaned.protein.groups.data
-    protein.groups.column<-'^Proteins$'
-  }
-  
-  protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
-  
-  colnames(evidence.data)[protein.groups.column.position] <- "Protein IDs"
+  # protein.groups.column <- ""
+  # 
+  # evidence.data <- clean.file.from.quotes(evidence.file)
+  # protein.groups.data <- NULL
+  # if (is.proteome.discoverer.data == TRUE) {
+  #   cat('Proteome Discoverer data...\n')
+  #   protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
+  # } else {
+  #   cat('Maxquant data...\n')
+  #   cleaned.protein.groups.data <- clean.file.from.quotes(protein.groups.file)
+  #   protein.groups.data <- cleaned.protein.groups.data
+  #   protein.groups.column<-'^Proteins$'
+  # }
+  # 
+  # protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
+  # 
+  # colnames(evidence.data)[protein.groups.column.position] <- "Protein IDs"
   
   if (is.proteome.discoverer.data == FALSE) {
     corrected.files <- correct.maxquant.protein.groups(protein.groups.data, evidence.data)
@@ -1056,20 +1056,19 @@ perform_analysis <- function() {
   
   # ###
   
-  ##########################  DIRTY ######################################
   # Should be setted on initialize.R  
-  if (ProteinQuantitation == TRUE) {
-    quantitation.status <- "Protein"
-  } else {
-    quantitation.status <- "Peptide"
-  }
-  
-  if( file.exists(limma.output.folder) == TRUE) {
-    unlink(limma.output.folder, recursive=T, force=T)
-  }
-  
-  dir.create(limma.output.folder)
-  
+  # if (ProteinQuantitation == TRUE) {
+  #   quantitation.status <- "Protein"
+  # } else {
+  #   quantitation.status <- "Peptide"
+  # }
+  # Moved to analyze.R/functions_analyze.R
+  # if( file.exists(limma.output.folder) == TRUE) {
+  #   unlink(limma.output.folder, recursive=T, force=T)
+  # }
+  # 
+  # dir.create(limma.output.folder)
+  # 
   # Moved to load_data.R
   # evidence.file <- "Dropbox/Review/case studies/evidence.txt"
   # protein.groups.file <- "Dropbox/Review/case studies/cleanProteinGroups.txt"

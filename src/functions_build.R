@@ -353,3 +353,190 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
   return (experimental.description)
 }
 
+find.proteome.discoverer.protein.column <- function(evidence.data) {
+  #
+  # Find the protein groups accession ids column from the Proteome Discoverer evidence file 
+  #
+  # Args:
+  #   evidence.data: The evidence file
+  #
+  # Returns:
+  #   The protein group accession id column name or the empty string
+  #
+  
+  # Initialize the protein groups column
+  protein.groups.column <- ""
+  
+  # And find the correct protein groups column depending on the version
+  if ("Protein Group Accessions" %in% colnames(evidence.data) == TRUE) {
+    protein.groups.column <- "Protein Group Accessions"
+  } else if ("Protein Accessions" %in% colnames(evidence.data) == TRUE) {
+    protein.groups.column <- "Protein Accessions"
+  } else {
+    # If the is no such column, abort the scripts execution
+    stop("The evidence dataset does not contain the columns 'Protein Group Accessions' or 'Protein Accessions'. Aborting...\n")
+  }
+  return (protein.groups.column)
+}
+
+correct.maxquant.files <- function(protein.groups.data, evidence.data) {
+  #
+  # Constructs a Protein Names column, if it is abscent, using the FASTA headers,
+  # cleans the protein groups of empty lines  and ad the columns id, Protein IDs, Protein Name
+  # to the evidence file.
+  #
+  # Args:
+  #   protein.groups.data:  The protein groups file
+  #   evidence.data:        The evidence file
+  #
+  # Returns:
+  #   A list with the corrected protein.groups file and the corrected evidence file
+  #
+  
+  
+  # Store the column names of the evidence and the protein groups files
+  protein.groups.column.names <- colnames(protein.groups.data)
+  evidence.column.names <- colnames(evidence.data)
+  
+  # Find the number of occurences of the Protein Names/Protein names (depending on the version)
+  number.of.Protein.Names.columns <- length(which(protein.groups.column.names == "Protein Names"))
+  number.of.Protein.names.columns <- length(which(protein.groups.column.names == "Protein names"))
+  
+  # If there is no Protein Names column
+  if(number.of.Protein.Names.columns == 0 && number.of.Protein.names.columns == 0){
+    
+    # Construnt one using the FASTA headers e.g. the fasta header
+    # >PROT123 SWISS-PROT: PROT123 my favourite protein;>PROT123 SWISS-PROT: PROT123 my second favourite protein
+    # will only keep the first entry (everything after ';' will be ingored) and it will also remove
+    # the >PROT123 part
+    protein.groups.data[, "Protein Names":= gsub("(^>[[:alnum:]]+[[:punct:][:blank:]])|(;>.*)|(;[[:alnum:]]+)",
+                                                 "",
+                                                 protein.groups.data[, `Fasta headers`],
+                                                 perl = TRUE)]
+  }
+  
+  # If the column exists just rename it
+  if (number.of.Protein.names.columns > 0)
+  {
+    setnames(protein.groups.data, "Protein names", "Protein.Names")
+  }
+  
+  # Reset the column names of the protein groups file
+  protein.groups.column.names <- colnames(protein.groups.data)
+  
+  # Order the table by the Evidence IDs for fast conditional empty line remove
+  setkey(protein.groups.data, `Evidence IDs`)
+  
+  # Remove lines with empty Evidence IDs
+  protein.groups.data <- protein.groups.data[!""]
+  
+  # In the protein groups file does not contain the column Protein IDs, but contains the column Peptide IDs,
+  # rename the Peptide IDs to Protein IDs
+  if (!"Protein IDs" %in% protein.groups.column.names &
+      "Peptide IDs" %in% protein.groups.column.names)
+  {
+    setnames(protein.groups.data, "Peptide IDs", "Protein IDs")
+  }
+  
+  # Subset the protein groups data.table keeping only the Protein IDs, Protein Names and Evidence IDs columns
+  protein.groups.subset <- protein.groups.data[ , 
+                                               .SD,
+                                               .SDcols = c("Protein IDs",
+                                                            "Protein Names",
+                                                            "Evidence IDs")]
+  # Break the each Evidence IDs cell in multiple by the ';' and merge them by their corresponding Protein ID and
+  # Protein Name
+  protein.groups.subset.multiline.evidence <- protein.groups.subset[ ,
+                                                                     list(`Evidence IDs` = unlist(strsplit(`Evidence IDs`,
+                                                                                                            ";"))),
+                                                                     by = list(`Protein IDs`, `Protein Names`)]
+  # Rename Evidence IDs column to id
+  # TODO to change if from id to ID
+  setnames(protein.groups.subset.multiline.evidence,
+           "Evidence IDs",
+           "id")
+  
+  # Change the class of the column from string to integer
+  class(protein.groups.subset.multiline.evidence$id) <- 'integer'
+  
+  # Order the id column
+  setkey(protein.groups.subset.multiline.evidence, id)
+  
+  # Now order the id column in the evidence file
+  setkey(evidence.data, id)
+  
+  # Make a unique code id the if the Protein IDs or Protein Names column exist
+  column.delete.case <- (any(grepl("Protein IDs", evidence.column.names, perl = TRUE)) * 1) +
+                        (any(grepl("Protein Names", evidence.column.names, perl = TRUE)) * 2) + 1
+  
+  # Depending on the code, delete the appropriate columns
+  # Unique Codes:
+  #   1:  Eveythins is OK
+  #   2:  Remove Protein IDs
+  #   3:  Remove Protein Names
+  #   4   Remove Protein IDs and Protein Names
+  #
+  switch(column.delete.case,
+         cat("No need for column deletion...\n"),
+         evidence.data[, "Protein IDs" := NULL],
+         evidence.data[, "Protein Names" := NULL],
+         evidence.data[, c("Protein IDs", "Protein Names") := NULL])
+  
+  # Reset the column names of the evidence file
+  evidence.column.names <- colnames(evidence.data)
+  
+  # Join the multiline protein groups table with the evidence table in order to
+  # make the data.table that we should have in the first place
+  merged.evidence.table <- merge(protein.groups.subset.multiline.evidence, evidence.data, by = "id")
+  
+  # TODO Should go to analyze.R and add Only identified by site
+  # merged.evidence.table.columns <- colnames(merged.evidence.table)
+  # if("Contaminant" %in% merged.evidence.table.columns){
+  #   setkey(merged.evidence.table, Contaminant)
+  #   merged.evidence.table <- merged.evidence.table[!"+"]
+  # }
+  # 
+  # if("Reverse" %in% merged.evidence.table.columns){
+  #   setkey(merged.evidence.table, Reverse)
+  #   merged.evidence.table <- merged.evidence.table[!"+"]
+  # }
+  
+  # Order the corrected evidence data.table by id
+  setkey(merged.evidence.table, id)
+  
+  # Wrap the corrected files in a list
+  corrected.files <- list("protein.groups.file"= protein.groups.data, "evidence.file" = merged.evidence.table)
+  
+  return (corrected.files)
+}
+
+build.analysis.data <- function(protein.groups.file, evidence.file, time.points, data.origin, keep.evidences.ids = TRUE) {
+  
+  # Initialize the protein groups column
+  protein.groups.column <- ""
+
+  # Initialize the protein groups data
+  protein.groups.data <- NULL
+  
+  # Pick the right protein groups column depending on the data origin
+  if (data.origin == "Proteome-Discoverer") {
+
+    # Explicit handling for the Proteome Discoverer as there are differences between versions
+    protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
+  } else {
+    protein.groups.column <- '^Proteins$'
+  }
+  
+  # Get the index of the protein groups accessions column
+  protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
+  
+  # And rename it as Protein IDs
+  colnames(evidence.data)[protein.groups.column.position] <- "Protein IDs"
+  
+  # If the data come from the MaxQuant correct the evidence and proteinGroups files
+  if (data.origin == "MaxQuant") {
+    corrected.files <- correct.maxquant.files(protein.groups.data, evidence.data)
+    protein.groups.data <- corrected.files$protein.groups.file
+    evidence.data <- corrected.files$evidence.file
+  }
+}
