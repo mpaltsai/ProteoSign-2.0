@@ -14,6 +14,17 @@ rm(list = grep(paste(c("^global.variables",
 # Read the experimental structure from the global variables list
 experimental.structure <- global.variables[["experimental.structure"]]
 
+# Initialize conditions.to.raw.files list
+conditions.to.raw.files.list <- list()
+
+# Build the conditions.to.raw.files list from the experimental structure matrix
+conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   experimental.structure[, c("raw file", "conditions")],
+                                                                            conditions.to.raw.files.list,
+                                                                            is.label.free = TRUE)
+
+# Add conditions.to.raw.files.list to the global variables list
+global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.list
+
 # Read parameters from the global variables list
 replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
 

@@ -326,12 +326,14 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   # 
   # colnames(evidence.data)[protein.groups.column.position] <- "Protein IDs"
   
-  if (is.proteome.discoverer.data == FALSE) {
-    corrected.files <- correct.maxquant.protein.groups(protein.groups.data, evidence.data)
-    
-    protein.groups.data <- corrected.files$protein.groups.file
-    evidence.data <- corrected.files$evidence.file
-  }
+  # if (is.proteome.discoverer.data == FALSE) {
+  #   corrected.files <- correct.maxquant.protein.groups(protein.groups.data, evidence.data)
+  #   
+  #   protein.groups.data <- corrected.files$protein.groups.file
+  #   evidence.data <- corrected.files$evidence.file
+  # }
+  
+  
   
   # In the case of Isobaric labeling we should reformat the table before
   # proceeding, afterwards we will treat the data as
@@ -397,12 +399,18 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   
   #levellog(paste0("read.protein.groups.data_v3: Identified proteins: ",length(unique(evidence$Protein.IDs))," (",time.point,")"))
   
-  old.evidence.data <- evidence.data
-  setkey(old.evidence.data, "Protein IDs")
-  evidence.data <- old.evidence.data[!" "]
+  # Duplicate from correct.maxquant.files 
+  # old.evidence.data <- evidence.data
+  # setkey(old.evidence.data, "Protein IDs")
+  # evidence.data <- old.evidence.data[!" "]
+  # 
+  # cat("read.protein.groups.data_v3: Discarded PSM records due to unassigned protein group: ", nrow(old.evidence.data) - nrow(evidence.data))
   
-  cat("read.protein.groups.data_v3: Discarded PSM records due to unassigned protein group: ", nrow(old.evidence.data) - nrow(evidence.data))
+  ###########
+  ##  WTF ###
+  ###########
   
+  #### Maybe duplicate of Maxquant block
   ## Make Protein.IDs human-readable
   if(is.proteome.discoverer.data == TRUE){
     protein.groups.column <- "Protein Descriptions"
@@ -412,9 +420,13 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   } else {
     protein.groups.column <- "Protein Names"
   }
-  #### Shady part, maybe errors, bugs, accidental demon summonning
-  #### Maybe duplicate of Maxquant block
   
+  
+  #####################
+  
+  #### Shady part, maybe errors, bugs, accidental demon summonning
+  # could be done fast with the paste of the 2 columns 
+  # the counting of the columns at the tmp.table2 is not used
   tmp.table <- evidence.data[, .SD, .SDcols = c("Protein IDs", protein.groups.column)]
   tmp.table$id <- 1:nrow(tmp.table)
   setkey(tmp.table, "Protein IDs")
@@ -435,34 +447,34 @@ read.protein.groups.data_v3 <- function(protein.groups.file,
   
   ## Assign defined labels (conditions), one for each PSM record
   
-  if (is.proteome.discoverer.data == TRUE) {
-    raw.file.column <- "Spectrum File" 
-  } else {
-    if ( "Raw File" %in% evidence.column.names) {
-      raw.file.column <- 'Raw File'
-    } else {
-      raw.file.column <- 'Raw file'
-    }
-  }
-  
-  
-  if(is.label.free == TRUE){
-    condition.specification.column <- raw.file.column
-    
-    if(is.isobaric == TRUE){
-      if (is.proteome.discoverer.data == TRUE) {
-        condition.specification.column <- "Modifications"
-      } else {
-        condition.specification.column <- "Labeling State"
-      }
-    }
-  } else {
-    if (is.proteome.discoverer.data == TRUE) {
-      condition.specification.column <- "Modifications"
-    } else {
-      condition.specification.column <- "Labeling State"
-    }
-  }
+  # if (is.proteome.discoverer.data == TRUE) {
+  #   raw.file.column <- "Spectrum File" 
+  # } else {
+  #   if ( "Raw File" %in% evidence.column.names) {
+  #     raw.file.column <- 'Raw File'
+  #   } else {
+  #     raw.file.column <- 'Raw file'
+  #   }
+  # }
+  # 
+  # 
+  # if(is.label.free == TRUE){
+  #   condition.specification.column <- raw.file.column
+  #   
+  #   if(is.isobaric == TRUE){
+  #     if (is.proteome.discoverer.data == TRUE) {
+  #       condition.specification.column <- "Modifications"
+  #     } else {
+  #       condition.specification.column <- "Labeling State"
+  #     }
+  #   }
+  # } else {
+  #   if (is.proteome.discoverer.data == TRUE) {
+  #     condition.specification.column <- "Modifications"
+  #   } else {
+  #     condition.specification.column <- "Labeling State"
+  #   }
+  # }
   
   if(replicate.multiplexing.is.used == TRUE){
     levellog("read.protein.groups.data_v3: Transforming data for Replication Multiplexing ...")

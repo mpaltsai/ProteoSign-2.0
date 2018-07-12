@@ -26,7 +26,9 @@ evidence.file <- paste(here(), "data-input", "evidence.txt", sep = "/")
 cat("Reading experimental structure file...\n")
 
 # Read the experimental structure file
-experimental.structure.table <- read.csv(experimental.structrure.file, stringsAsFactors = FALSE)
+experimental.structure.table <- read.csv(experimental.structrure.file,
+                                         stringsAsFactors = FALSE,
+                                         check.names = FALSE)
 
 # Add the experimental structrue to the global.variables list
 global.variables[["experimental.structure"]] <- experimental.structure.table

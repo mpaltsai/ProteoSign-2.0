@@ -1086,7 +1086,7 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
   
   for(i in 1:length(conditions.labels)){
     if(PDdata){
-	  if(LabelFree){
+	   if(LabelFree){
 	    if(!IsobaricLabel)
 	    {
         mi<-which(grepl(conditions.labels[i], LFQ_conds[, "condition"]))
