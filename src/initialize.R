@@ -4,9 +4,11 @@
 # Clear enviroment
 rm(list = grep("^project.variables|^check.packages", ls(), value = TRUE, invert = TRUE))
 
-global.variables <- list("quantitation.type" = "Proteins",
-                         "replicate.multiplexing.is.used" = FALSE,
-                         "dataset.origin" = "MaxQuant")
+global.variables <- list("quantitation.type" =              "Proteins",
+                         "replicate.multiplexing.is.used" =  FALSE,
+                         "dataset.origin" =                  "MaxQuant",
+                         "is.label.free" =                   TRUE)
+
 
 # Project Packages to be installed
 cran.packages <- c("data.table")
@@ -36,8 +38,16 @@ if (project.variables[["development.stage"]] == TRUE) {
   # in order to work packrat package installation
   setwd(here())
   
-  # Snapshot loaded packages
-  snapshot()
+  # Check the packrat packages status
+  packages.status <- status()
+  
+  # Are the packages in the last snapshot, the same as in the local downloaded packages?
+  packages.are.up.to.date <- all(packages.status$packrat.version == packages.status$library.version)
+  
+  # If not, snapshot the loaded packages
+  if (packages.are.up.to.date == FALSE) {
+    snapshot()  
+  }
   
   # Reset current working
   setwd(here("src"))

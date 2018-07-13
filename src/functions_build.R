@@ -195,8 +195,8 @@ replicates.per.condition <- function(biological.replicates, technical.replicates
   #   vectors, belonging to each condition
   #
   #   condition: The condition name 
-  #     biological: A vector with the biological replicates for the parent condition
-  #     technical:  A vector with the technical replicates for the parent condition
+  #     biological.replicates: A vector with the biological replicates for the parent condition
+  #     technical.replicates:  A vector with the technical replicates for the parent condition
   #
   
   # Make empty list for replicates per condition
@@ -215,8 +215,8 @@ replicates.per.condition <- function(biological.replicates, technical.replicates
     technical.replicates.per.condition <- technical.replicates[raw.files.per.condition]
     
     # Wrap them in a list element
-    new.element <- list("biological" = biological.replicates.per.condition,
-                        "technical"= technical.replicates.per.condition)
+    new.element <- list("biological.replicates" = biological.replicates.per.condition,
+                        "technical.replicates"= technical.replicates.per.condition)
     
     # Add element to list
     replicates.per.condition[[condition]] <- new.element
@@ -240,8 +240,8 @@ check.replicates <- function(biological.replicates, technical.replicates) {
   #   A list with 2 booleans for each replicate type (biological/technical) regarding 
   #   if the numbering is correct or not
   #
-  #   biological: TRUE if the numbering is correct, otherwise FALSE
-  #   technical:  TRUE if the numbering is correct, otherwise FALSE
+  #   biological.replicates: TRUE if the numbering is correct, otherwise FALSE
+  #   technical.replicates:  TRUE if the numbering is correct, otherwise FALSE
   #
   
   # Find the unique numbers for each vector and sort them
@@ -250,15 +250,15 @@ check.replicates <- function(biological.replicates, technical.replicates) {
   
   expected.biological.replicates <- c(1:length(unique.biological.replicates))
   expected.technical.replicates <- c(1:length(unique.technical.replicates))
-  
+
   # If the length of each vector equals the unique numbers,
   # then the replicate vector is correct, otherwise it is incorrect 
   biological.replicates.are.ok <- all(unique.biological.replicates == expected.biological.replicates)
   technical.replicates.are.ok <- all(unique.technical.replicates == expected.technical.replicates)
   
   # Now put them in a list
-  replicates.status <- list( "biological" = biological.replicates.are.ok,
-                             "technical" = technical.replicates.are.ok)
+  replicates.status <- list( "biological.replicates" = biological.replicates.are.ok,
+                             "technical.replicates" = technical.replicates.are.ok)
   
   return (replicates.status)
 }
@@ -278,8 +278,8 @@ replicates.status.per.condition <- function(replicates.per.condition) {
   #   biological and technical replicates belonging to each condition
   #
   #   condition: The condition name 
-  #     biological: A boolean for the correctness of the biological replicates
-  #     technical:  A boolean for the correctness of the technical replicates
+  #     biological.replicates: A boolean for the correctness of the biological replicates
+  #     technical.replicates:  A boolean for the correctness of the technical replicates
   #
   
   # Make the list
@@ -357,7 +357,7 @@ fix.replicates <- function(biological.replicates, technical.replicates) {
   
   # Finally make the list of the corrected vectors
   fixed.replicates <- list(biological.replicates, technical.replicates)
-  names(fixed.replicates) <- c("biological", "technical")
+  names(fixed.replicates) <- c("biological.replicates", "technical.replicates")
   return (fixed.replicates)
 }
 
@@ -384,8 +384,8 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
   # Traverse over replicates per condition
   for (index in 1:length(replicates.status.per.condition)) {
     condition <- names(replicates.status.per.condition)[index]
-    biological.status <- replicates.status.per.condition[[index]]$biological
-    technical.status  <- replicates.status.per.condition[[index]]$technical
+    biological.status <- replicates.status.per.condition[[index]]$biological.replicates
+    technical.status  <- replicates.status.per.condition[[index]]$technical.replicates
     
     # Make a code using the biological/technical replicates status
     # for faster comparison than if/else
@@ -403,8 +403,8 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
       
       # Get the biological/technical replicates vector for a particural
       # to be fixed
-      biological.replicates <- replicates.per.condition[[index]]$biological
-      technical.replicates <- replicates.per.condition[[index]]$technical
+      biological.replicates <- replicates.per.condition[[index]]$biological.replicates
+      technical.replicates <- replicates.per.condition[[index]]$technical.replicates
       
       # Now fix the bad replicates
       fixed.replicates <- fix.replicates(biological.replicates,
@@ -435,18 +435,18 @@ restore.replicates <- function(replicates.per.condition) {
   #
   
   # Create the new vectors
-  biological <- c()
-  technical <- c()
+  biological.replicates <- c()
+  technical.replicates <- c()
   
   # Iterate over the conditions
-  for (rep in replicates.per.condition) {
+  for (condition in replicates.per.condition) {
     
     # Add the biological/technical replicates of each condition to the vector
-    biological <- c(biological, rep$biological)
-    technical <- c(technical, rep$technical)
+    biological.replicates <- c(biological.replicates, condition$biological.replicates)
+    technical.replicates <- c(technical.replicates, condition$technical.replicates)
   }
   # Finally wrap them in a list
-  restored.replicates <- list("biological" = biological, "technical" = technical)
+  restored.replicates <- list("biological.replicates" = biological.replicates, "technical.replicates" = technical.replicates)
   return (restored.replicates)
 }
 

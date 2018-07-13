@@ -101,5 +101,9 @@ files.to.load <- c( "initialize.R",
 # Set the currenct working directory
 setwd(here("src"))
 
-# Run the scripts
-successful.run <- unlist(lapply(files.to.load, source))
+# Try to run the scripts, if something is wrong, stop the analysis with an error message
+tryCatch(lapply(files.to.load, source),
+         error = function(error) {
+           cat(error[[1]],"\n")
+           }
+         )

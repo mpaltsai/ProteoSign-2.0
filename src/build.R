@@ -14,11 +14,21 @@ rm(list = grep(paste(c("^global.variables",
 # Read the experimental structure from the global variables list
 experimental.structure <- global.variables[["experimental.structure"]]
 
+# Order the experimental structure by raw.file name
+experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
+
 # Initialize conditions.to.raw.files list
 conditions.to.raw.files.list <- list()
 
+# Get the raw.files.condition.matrix
+raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
+
+# Order the raw.files.condition.matrix structure by raw.file name
+raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$raw.file),]
+
+
 # Build the conditions.to.raw.files list from the experimental structure matrix
-conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   experimental.structure[, c("raw file", "conditions")],
+conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
                                                                             conditions.to.raw.files.list,
                                                                             is.label.free = TRUE)
 
@@ -28,22 +38,23 @@ global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.li
 # Read parameters from the global variables list
 replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
 
+experimental.structure$condition <- raw.files.condition.matrix$condition 
 # Reorder the experimental structure based on conditions/biological replicates
 # /technical replicates/ fractions
 experimental.structure <- experimental.structure[
-  order(experimental.structure$conditions,
-        experimental.structure$biological,
-        experimental.structure$technical,
-        experimental.structure$fractions), ]
+  order(experimental.structure$condition,
+        experimental.structure$biological.replicate,
+        experimental.structure$technical.replicate,
+        experimental.structure$fraction), ]
 
 # Correct the rownames
 rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
 
 # Store each column on a separate variable
-biological.replicates.list <- experimental.structure$biological
-technical.replicates.list <- experimental.structure$technical
-experimental.fraction.list <- experimental.structure$fractions
-experimental.conditions.list <- experimental.structure$conditions
+biological.replicates.list <- experimental.structure$biological.replicate
+technical.replicates.list <- experimental.structure$technical.replicate
+fraction.list <- experimental.structure$fraction
+experimental.conditions.list <- experimental.structure$condition
 
 # Do I have more than 1 replicate 
 # but without replicate multiplexing?
@@ -52,9 +63,7 @@ biological.replicates.number.status <- check.replicates.number(replicates.multip
 
 # If not inform user and abort analysis
 if (biological.replicates.number.status  == FALSE) {
-  stop("Cannot accept dataset with just one biological replicate. Aborting ...\n")
-  # TODO Handle the sourcing in order to stop
-  
+  stop("Cannot accept dataset with just one biological replicate. Aborting...")
 }
 
 # Make a list of list where each element is a condition paired
@@ -77,19 +86,27 @@ replicates.per.condition <- fixed.replicates.per.condition
 # Make a list with the corrected replicates concatenated
 restored.replicates <- restore.replicates(replicates.per.condition)
 
+# Are the biological and the technical replicates different from the initial data, provided by the user?
+biological.replicates.are.the.same <- Reduce("&", biological.replicates.list == restored.replicates$biological.replicates)
+technical.replicates.are.the.same <- Reduce("&", technical.replicates.list == restored.replicates$technical.replicates)
+
+# If they are different, inform the user!
+if (biological.replicates.are.the.same == FALSE |
+    technical.replicates.are.the.same == FALSE) {
+    message("Attetion: The experimental structure has been corrected due to mistyped replicates (gaps in the numbering e.g. 1, 2, 4 instead of 1, 2, 3).")  
+}
+
 # Restore the biological replicates list
-biological.replicates.list <- restored.replicates$biological
+biological.replicates.list <- restored.replicates$biological.replicates
 
 # Restore the technical replicates list
-technical.replicates.list <- restored.replicates$technical
+technical.replicates.list <- restored.replicates$technical.replicates
 
 # Restore the biological column on the experimenta structure file
-experimental.structure$biorep <- biological.replicates.list
+experimental.structure$biological.replicate <- biological.replicates.list
 
 # Restore the technical column on the experimenta structure file
-experimental.structure$techrep <- technical.replicates.list
-
-# TODO If bioreps and techreps are changed inform the user!
+experimental.structure$technical.replicate <- technical.replicates.list
 
 # Now exploit the check.number.of.replicates to find if there are
 # replicates of each type in our experiment and construct the setup id
@@ -108,12 +125,12 @@ experimental.setup.id <-  1 * check.replicates.number(replicates.multiplexing,
                                                          technical.replicates.list) +
                           
                           3 * check.replicates.number(replicates.multiplexing,
-                                                         experimental.fraction.list)
+                                                         fraction.list)
 
 experimental.description <- make.experimental.description(experimental.setup.id,
                                                           biological.replicates.list,
                                                           technical.replicates.list,
-                                                          experimental.fraction.list)
+                                                          fraction.list)
 
 # Add a description column to the experimental structure matrix
 experimental.structure$description <- experimental.description
@@ -126,11 +143,11 @@ global.variables[["experimental.structure"]] <- experimental.structure
 
 # Store max biological replicates for duplicates handling from limma
 global.variables[["max.biological.replicates"]] <- experimental.structure[,
-                                                                          which.max(biological)]
+                                                                          which.max(biological.replicate)]
 
 # Store the minimum number of technical replicates
 global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
-                                                           .SD[which.max(technical)],
-                                                           by = biological]$technical)
+                                                           .SD[which.max(technical.replicate)],
+                                                           by = biological.replicate]$technical.replicate)
 
 
