@@ -611,16 +611,16 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # TODO to change if from id to ID
   setnames(protein.groups.subset.multiline.evidence,
            "Evidence IDs",
-           "id")
+           "ID")
   
   # Change the class of the column from string to integer
-  class(protein.groups.subset.multiline.evidence$id) <- 'integer'
+  class(protein.groups.subset.multiline.evidence$ID) <- 'integer'
   
   # Order the id column
-  setkey(protein.groups.subset.multiline.evidence, id)
+  setkey(protein.groups.subset.multiline.evidence, ID)
   
   # Now order the id column in the evidence file
-  setkey(evidence.data, id)
+  setkey(evidence.data, ID)
   
   # Make a unique code id the if the Protein IDs or Protein Names column exist
   column.delete.case <- (any(grepl("Protein IDs", evidence.column.names, perl = TRUE)) * 1) +
@@ -644,7 +644,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   
   # Join the multiline protein groups table with the evidence table in order to
   # make the data.table that we should have in the first place
-  merged.evidence.table <- merge(protein.groups.subset.multiline.evidence, evidence.data, by = "id")
+  merged.evidence.table <- merge(protein.groups.subset.multiline.evidence, evidence.data, by = "ID")
   
   # TODO Should go to analyze.R and add Only identified by site
   # merged.evidence.table.columns <- colnames(merged.evidence.table)
