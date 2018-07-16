@@ -947,7 +947,7 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
   levellog(paste0("read.pgroups_v3: Identified proteins: ",length(unique(evidence$Protein.IDs))," (",time.point,")"))
   
   n1<-nrow(evidence)
-  evidence<-evidence[nchar(evidence$Protein.IDs) > 0,]
+  evidence<-evidence[ nchar(evidence$Protein.IDs) > 0, ]
   levellog(paste0("read.pgroups_v3: Discarded PSM records due to unassigned protein group: ",(n1-nrow(evidence))))
   ## Make Protein.IDs human-readable
   if(PDdata){

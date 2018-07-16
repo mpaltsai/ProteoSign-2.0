@@ -63,7 +63,7 @@ cat("Reading evidence file: ", evidence.file,"...\n", sep = "")
 cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", evidence.file)
 
 # Read the evidence data
-evidence.data <- fread(cleaning.command, integer64 = "numeric", check.names = TRUE)
+evidence.data <- fread(cleaning.command, integer64 = "numeric")
 
 cat("Evidence file loaded!\n")
 
@@ -79,7 +79,7 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
   cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", protein.groups.file)
   
   # Read the proteinGroups data
-  protein.groups.data <- fread(cleaning.command, integer64 = "numeric", , check.names = TRUE)
+  protein.groups.data <- fread(cleaning.command, integer64 = "numeric")
   
   cat("ProteinGroups file loaded!\n")
   

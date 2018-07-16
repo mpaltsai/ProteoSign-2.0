@@ -550,7 +550,6 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   #   A list with the corrected protein.groups file and the corrected evidence file
   #
   
-  
   # Store the column names of the evidence and the protein groups files
   protein.groups.column.names <- colnames(protein.groups.data)
   evidence.column.names <- colnames(evidence.data)
@@ -607,8 +606,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
                                                                      list(`Evidence IDs` = unlist(strsplit(`Evidence IDs`,
                                                                                                             ";"))),
                                                                      by = list(`Protein IDs`, `Protein Names`)]
-  # Rename Evidence IDs column to id
-  # TODO to change if from id to ID
+  # Rename Evidence IDs column to ID in the multiple evidence table
   setnames(protein.groups.subset.multiline.evidence,
            "Evidence IDs",
            "ID")
@@ -633,6 +631,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   #   3:  Remove Protein Names
   #   4   Remove Protein IDs and Protein Names
   #
+  
   switch(column.delete.case,
          cat("No need for column deletion...\n"),
          evidence.data[, "Protein IDs" := NULL],
@@ -641,12 +640,12 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   
   # Reset the column names of the evidence file
   evidence.column.names <- colnames(evidence.data)
-  
-  # Join the multiline protein groups table with the evidence table in order to
+
+    # Join the multiline protein groups table with the evidence table in order to
   # make the data.table that we should have in the first place
   merged.evidence.table <- merge(protein.groups.subset.multiline.evidence, evidence.data, by = "ID")
-  
-  # TODO Should go to analyze.R and add Only identified by site
+
+    # TODO Should go to analyze.R and add Only identified by site
   # merged.evidence.table.columns <- colnames(merged.evidence.table)
   # if("Contaminant" %in% merged.evidence.table.columns){
   #   setkey(merged.evidence.table, Contaminant)
@@ -659,7 +658,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # }
   
   # Order the corrected evidence data.table by id
-  setkey(merged.evidence.table, id)
+  setkey(merged.evidence.table, ID)
   
   # Wrap the corrected files in a list
   corrected.files <- list("protein.groups.data"= protein.groups.data, "evidence.data" = merged.evidence.table)
@@ -709,15 +708,117 @@ get.evidence.metadata <- function(evidence.columns, analysis.parameters) {
   switch(status.code,
          metadata <- set.evidence.metadata("Spectrum File", "Modifications"), 
          metadata <- set.evidence.metadata("Raw File", "Labeling State"), 
-         metadata <- set.evidence.metadata("", ""), 
-         metadata <- set.evidence.metadata("", ""))
+         metadata <- set.evidence.metadata("Spectrum File", "Modifications"),
+         metadata <- set.evidence.metadata("Raw File", "Raw File"))
   
   return (metadata)
 
 }
+
+reform.evidence.isobaric.to.label.free <- function(evidence.data, data.origin) {
+  #
+  # Reforms the evidence.data table in an isobaric experiment turning it from wide format
+  # into long format in order to treat it as a label free experiment
+  #
+  # Args:
+  # evidence.data:  The evidence.data table
+  # data.origin:    "MaxQuant" or "Proteome Discoverer" depending on the origin of the data
+  #
+  # Return:
+  #   The reformated evidence.data table
+  #
   
+  # TODO  
+  # Get the column names of the file
+  evidence.columns <- colnames(evidence.data)
+  
+  if (data.origin == "MaxQuant") {
+    
+    # Get the columns names that we will remove
+    columns.to.melt <- grep("^Reporter.intensity.[[:digit:]]",
+                            evidence.columns,
+                            value = TRUE,
+                            perl = TRUE)
+    
+    columns.to.remove <- grep(paste(c("Intensity", columns.to.melt), collapse = "|"), evidence.columns)
+    
+    # Id.vars are the column names that will be left untouched by the melt function of data.table
+    # Essentially the contain all the column names but Intensity and Reporter intensity X where X = 1, 2, 3 etc
+    id.vars <- evidence.columns[-c(columns.to.remove)]
+    
+    # Now melt the data.table to turn it from wide to long format
+    evidence.data <- melt(evidence.data,
+                          id.vars = id.vars,
+                          measure.vars = columns.to.melt,
+                          variable.name = "Labeling.State",
+                          value.name = "Intensity")
+  
+    # conditions.labels<<-sub("^X", "Reporter.intensity.", conditions.labels)
+    
+    # if (AllowLabelRename == T)
+    # {
+    #   Rename_Array$old_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1", Rename_Array$old_label)
+    #   Rename_Array$new_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1", Rename_Array$new_label)
+    # }
+    # if (AllowLS == T)
+    # {
+    #   Ls_array$first_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1",  Ls_array$first_label)
+    #   Ls_array$second_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1",  Ls_array$second_label)
+    # }
+    
+    is.label.free <- TRUE;
+    # filterL_lbl <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1",  filterL_lbl)
+    
+    # CMBACK    
+    # if(RMisused){
+    #   RMtagsdata$name <- sub("^([[:digit:]]*[[:alpha:]]?)$", "Reporter.intensity.\\1",  RMtagsdata$name)
+    # }
+  } else {
+    # Get the columns names that we will remove
+    columns.to.melt <- grep("^Abundance..[[:digit:]]*[[:alpha:]]?$",
+                            evidence.columns,
+                            value = TRUE,
+                            perl = TRUE)
+    
+    columns.to.remove <- grep(paste(c("Intensity", columns.to.melt), collapse = "|"), evidence.columns)
+    
+    # Id.vars are the column names that will be left untouched by the melt function of data.table
+    # Essentially the contain all the column names but Intensity and Reporter intensity X where X = 1, 2, 3 etc
+    id.vars <- evidence.columns[-c(columns.to.remove)]
+    
+    # Now melt the data.table to turn it from wide to long format
+    evidence.data <- melt(evidence.data,
+                          id.vars = id.vars,
+                          measure.vars = columns.to.melt,
+                          variable.name = "Modifications",
+                          value.name = "Intensity")
+    
+ 
+  #   LabelFree<-T;
+  #   if (AllowLabelRename == T)
+  #   {
+  #     Rename_Array$old_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", Rename_Array$old_label)
+  #     Rename_Array$new_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", Rename_Array$new_label)
+  #   }
+  #   if (AllowLS == T)
+  #   {
+  #     Ls_array$first_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", Ls_array$first_label)
+  #     Ls_array$second_label <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", Ls_array$second_label)
+  #   }
+  #   filterL_lbl <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", filterL_lbl)
+  #   if(RMisused){
+  #     RMtagsdata$name <- sub("^([[:digit:]]*[[:alpha:]]?)$", "X\\1", RMtagsdata$name)
+  #   }
+  }
+  return (evidence.data)  
+}
+
 build.analysis.data <- function(protein.groups.data, evidence.data, time.points, data.origin, keep.evidences.ids = TRUE) {
   
+  protein.groups.data <- global.variables$protein.groups.data
+  evidence.data <- global.variables$evidence.data
+  
+  data.origin <- "MaxQuant"
   # Initialize the protein groups column
   protein.groups.column <- ""
   
@@ -740,7 +841,24 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
   if (data.origin == "MaxQuant") {
     corrected.files <- correct.maxquant.files(protein.groups.data, evidence.data)
     protein.groups.data <- corrected.files$protein.groups.data
-    evidence.data <- corrected.files$protein.groups.data
+    evidence.data <- corrected.files$evidence.data
+  }
+  
+  # Order the evidence.data by the Protein IDs
+  setkey(evidence.data, `Protein IDs`)
+  
+  # And remove any row with empty Protein IDs
+  evidence.data <- evidence.data[!""]
+  
+  # In the case of an isobaric labeled experiment we can treat is as if it was label-free,
+  # after some reformating 
+  if(is.isobaric == TRUE) {
+    
+    # Reform the evidence data table
+    evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, data.origin)
+    
+    # Set the label.free flag to TRUE
+    is.label.free <- TRUE
   }
   
   analysis.parameters <- list("data.origin" = data.origin,

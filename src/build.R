@@ -150,4 +150,6 @@ global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(technical.replicate)],
                                                            by = biological.replicate]$technical.replicate)
 
+cat("end of build.R\n")
+
 
