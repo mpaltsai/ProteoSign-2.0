@@ -574,7 +574,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # If the column exists just rename it
   if (number.of.Protein.names.columns > 0)
   {
-    setnames(protein.groups.data, "Protein names", "Protein.Names")
+    setnames(protein.groups.data, "Protein names", "Protein Names")
   }
   
   # Reset the column names of the protein groups file
@@ -614,8 +614,13 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # Change the class of the column from string to integer
   class(protein.groups.subset.multiline.evidence$ID) <- 'integer'
   
-  # Order the id column
+  # Order the protein.groups.subset.multiline.evidence by the id column
   setkey(protein.groups.subset.multiline.evidence, ID)
+  
+  # Renames the evidence data column name id to ID
+  setnames(evidence.data,
+           "id",
+           "ID")
   
   # Now order the id column in the evidence file
   setkey(evidence.data, ID)
@@ -813,14 +818,81 @@ reform.evidence.isobaric.to.label.free <- function(evidence.data, data.origin) {
   return (evidence.data)  
 }
 
+trim.evidence.data.protein.descriptions <- function(evidence.data, protein.description.column) {
+  #
+  # Pastes and trims the evidence protein ids  with the appropriate protein description column
+  # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
+  # 
+  # Args:
+  #   evidence.data:              The evidence.data table
+  #   protein.description.column: The appropriate description column depending on the data.origin 'Protein Descriptions'
+  #                               for Proteome Discoverer or Proteins Names for MaxQuant. 
+  #
+  # Returns:
+  #   The pasted and trimmed description column
+  #
+  
+  # Subset the evidence data and keep only the Protein IDs column and the Description Column
+  evidence.subset <- evidence.data[,
+                                   .SD,
+                                   .SDcols = c("Protein IDs",
+                                               protein.description.column)]
+  
+  # Add an index column for ordering
+  evidence.subset[, index := c(1:nrow(evidence.data))]
+  
+  # Set the key to Protein IDs for later merging
+  setkey(evidence.subset, "Protein IDs")
+  
+  # Now make a table with the number of the occurences of each protein
+  protein.occurences <- evidence.subset[,
+                                        .(n=.N),
+                                        by="Protein IDs"]
+  
+  # Set the key to Protein IDs for later merging
+  setkey(protein.occurences, "Protein IDs")
+  
+  
+  # Now paste the columns Protein IDs/ Description and separate them with a ' ['
+  evidence.subset[, 
+                  "Trimmed Protein Description" := do.call( paste,
+                                                            c(  .SD,
+                                                                sep = " [")), 
+                  .SDcols = c("Protein IDs",
+                              protein.description.column)]
+  
+  # Keep only the first 60 characters of the description
+  evidence.subset[,
+                  "Temp Trimmed Description" := gsub("^(.{60}).*",
+                                                     "\\1",
+                                                     as.character(`Trimmed Protein Description`),
+                                                     perl = TRUE)]
+  
+  # And finally paste the ']...' at the end of the trimmed description
+  evidence.subset[, 
+                  "Trimmed Protein Description" := do.call( paste,
+                                                            c( .SD,
+                                                               "]...",
+                                                               sep = "")), 
+                  .SDcols = "Trimmed Protein Description"]
+  
+  # Order the table and get the trimmed protein descriptions
+  new.protein.ids <- protein.occurences[evidence.subset][order(index), `Trimmed Protein Description`]
+  
+  return (new.protein.ids)
+}
+
 build.analysis.data <- function(protein.groups.data, evidence.data, time.points, data.origin, keep.evidences.ids = TRUE) {
   
-  protein.groups.data <- global.variables$protein.groups.data
-  evidence.data <- global.variables$evidence.data
-  
+  protein.groups.data <- copy(global.variables[["protein.groups.data"]])
+  evidence.data <- copy(global.variables[["evidence.data"]])
+  is.isobaric <- FALSE
   data.origin <- "MaxQuant"
   # Initialize the protein groups column
   protein.groups.column <- ""
+  
+  # Initialize evidence column names
+  evidence.column.names <- colnames(evidence.data)
   
   # Pick the right protein groups column depending on the data origin
   if (data.origin == "Proteome-Discoverer") {
@@ -835,7 +907,10 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
   protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
   
   # And rename it as Protein IDs
-  colnames(evidence.data)[protein.groups.column.position] <- "Protein IDs"
+  evidence.column.names[protein.groups.column.position] <- "Protein IDs"
+  
+  # Reset evidence column names
+  evidence.column.names <- colnames(evidence.data)
   
   # If the data come from the MaxQuant correct the evidence and proteinGroups files
   if (data.origin == "MaxQuant") {
@@ -854,12 +929,30 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
   # after some reformating 
   if(is.isobaric == TRUE) {
     
+    cat("We have an isobaric label file!\n")
     # Reform the evidence data table
     evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, data.origin)
     
     # Set the label.free flag to TRUE
     is.label.free <- TRUE
   }
+  
+  # Reset evidence column names
+  evidence.column.names <- colnames(evidence.data)
+  
+  if (data.origin == "MaxQuant") {
+    protein.description.column <- "Protein Names"
+  } else {
+    protein.description.column <- "Protein Descriptions"
+    if (! protein.description.column %in% evidence.column.names) {
+      evidence.data[, `Protein Descriptions` := ""]
+    }
+  }
+  
+  # Paste and trim the evidence protein ids  with the appropriate protein description column
+  # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
+  evidence.data$`Protein IDs` <- trim.evidence.data.protein.descriptions(evidence.data,
+                                                                         protein.description.column)
   
   analysis.parameters <- list("data.origin" = data.origin,
                               "is.isobaric" = FALSE,
@@ -869,6 +962,5 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
                               "replicate.multiplexing" = FALSE)
   
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data), analysis.parameters)
-  
   
 }
