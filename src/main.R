@@ -58,6 +58,9 @@ if (dir.exists("packrat") == FALSE &
   # Install packrat as the base package manager
   check.packages("packrat")
   
+  # Load Packrat
+  library(packrat)
+  
   # # Remove old packrat
   # system("rm -rf packrat/ .Rprofile")
   

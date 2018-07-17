@@ -686,35 +686,61 @@ set.evidence.metadata <- function(raw.file.column, condition.column) {
   return (metadata)
 }
 
-get.evidence.metadata <- function(evidence.columns, analysis.parameters) {
+get.evidence.metadata <- function(evidence.columns, data.origin, is.label.free, is.isobaric) {
   #
   # Return a list with metadata (raw file column/ condition column) of the evidence dataset
   #
   # Args:
   #   evidence.columns:   A string vector with the column names of the evidence file
-  #   analysis.parameters:A list with the parameters of the analysis
+  #   data.origin:        A string 'MaxQuant' or 'Proteome-Discoverer' for the origin of the data
+  #   is.label.free:      TRUE or FALSE depending on the experiment type label-free or labeled
+  #   is.isobaric:        TRUE or FALSE depending on the experiment type isobaric or not
   #
   # Returns:
   #   A list with the metadata
   #
   
   # Initialize the variables using the analysis.parameters
-  origin.is.maxquant <- analysis.parameters[["data.origin"]] == "MaxQuant"
-  is.label.free <- analysis.parameters[["is.label.free"]]
+  origin.is.maxquant <- data.origin == "MaxQuant"
   
   # Set the code depending on the combination of the analysis
-  status.code <-  (origin.is.maxquant * 1) + (is.label.free * 2) + 1
+  status.code <-  (origin.is.maxquant * 1)  +
+                  (is.label.free * 2)       + 1
   
   # 1: Proteome Discoverer and labeled experiment
   # 2: MaxQuant and labeled experiment
-  # 3: Proteome Discoverer and label-free experiment
-  # 4: MaxQuant and label-free experiment
+  # 3: Proteome Discoverer and label-free experiment OR Isobaric!     ### BEWARE  ###
+  # 4: MaxQuant and label-free experiment OR Isobaric!                ### BEWARE  ###
   # TODO check real data!
-  switch(status.code,
-         metadata <- set.evidence.metadata("Spectrum File", "Modifications"), 
-         metadata <- set.evidence.metadata("Raw File", "Labeling State"), 
-         metadata <- set.evidence.metadata("Spectrum File", "Modifications"),
-         metadata <- set.evidence.metadata("Raw File", "Raw File"))
+  
+  # Depending on the MaxQuant version there are might be slight 
+  #  differences in the column names
+  if (status.code == 2 | status.code == 4) {
+    if ("Raw File" %in% evidence.columns == TRUE) {
+      maxquant.raw.file.column <- "Raw File"
+    } else {
+      maxquant.raw.file.column <- "Raw file"
+    }
+  }
+  
+  switch( status.code,
+          metadata <- set.evidence.metadata("Spectrum File", "Modifications"), 
+          metadata <- set.evidence.metadata(maxquant.raw.file.column, "Labeling State"), 
+          {
+           if (is.isobaric == TRUE) {
+             metadata <- set.evidence.metadata("Spectrum File", "Modifications")
+           } else {
+             metadata <- set.evidence.metadata("Spectrum File", "Spectrum File")
+           }
+          },
+          {
+            # Correct for isobaric
+            if (is.isobaric == TRUE) {
+              metadata <- set.evidence.metadata(maxquant.raw.file.column, "Labeling State")
+            } else {
+              metadata <- set.evidence.metadata(maxquant.raw.file.column, maxquant.raw.file.column)
+            }
+          })
   
   return (metadata)
 
