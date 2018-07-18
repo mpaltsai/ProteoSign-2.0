@@ -54,3 +54,5 @@ if (project.variables[["development.stage"]] == TRUE) {
 }
 
 source("functions.R")
+
+cat("========== End of initialize.R ==========\n")

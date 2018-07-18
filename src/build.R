@@ -1,6 +1,9 @@
 # Data wrangling with dplyr/tidyr/etc. All the magic happens here. Newly created
 # files in workspace should be displayed. A build boolean variable can be used for
 # data reload from RDS for faster data reload.
+# Data wrangling with dplyr/tidyr/etc. All the magic happens here. Newly created
+# files in workspace should be displayed. A build boolean variable can be used for
+# data reload from RDS for faster data reload.
 
 # Clear enviroment and only keep functions and global/project variables
 rm(list = grep(paste(c("^global.variables",
@@ -24,13 +27,52 @@ conditions.to.raw.files.list <- list()
 raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
 
 # Order the raw.files.condition.matrix structure by raw.file name
-raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$raw.file),]
+raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$`raw file`),]
 
 
 # Build the conditions.to.raw.files list from the experimental structure matrix
 conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
-                                                                            conditions.to.raw.files.list,
                                                                             is.label.free = TRUE)
+
+# The conditions that we want to focus on
+conditions.to.compare <- names(conditions.to.raw.files.list)
+
+# Add them in the global.variables list
+global.variables[["conditions.to.compare"]] <- conditions.to.compare
+# Clear enviroment and only keep functions and global/project variables
+rm(list = grep(paste(c("^global.variables",
+                       "^project.variables",
+                       lsf.str()),
+                     collapse = "|"),
+               ls(),
+               value = TRUE,
+               invert = TRUE))
+
+# Read the experimental structure from the global variables list
+experimental.structure <- global.variables[["experimental.structure"]]
+
+# Order the experimental structure by raw.file name
+experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
+
+# Initialize conditions.to.raw.files list
+conditions.to.raw.files.list <- list()
+
+# Get the raw.files.condition.matrix
+raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
+
+# Order the raw.files.condition.matrix structure by raw.file name
+raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$`raw file`),]
+
+
+# Build the conditions.to.raw.files list from the experimental structure matrix
+conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
+                                                                            is.label.free = TRUE)
+
+# The conditions that we want to focus on
+conditions.to.compare <- c("WT", "MT1")
+
+# Add them in the global.variables list
+global.variables[["conditions.to.compare"]] <- conditions.to.compare
 
 # Add conditions.to.raw.files.list to the global variables list
 global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.list
@@ -150,6 +192,6 @@ global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(technical.replicate)],
                                                            by = biological.replicate]$technical.replicate)
 
-cat("end of build.R\n")
+cat("========== End of build.R ==========\n")
 
 

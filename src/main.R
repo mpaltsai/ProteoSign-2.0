@@ -104,6 +104,8 @@ files.to.load <- c( "initialize.R",
 # Set the currenct working directory
 setwd(here("src"))
 
+cat("========== End of main.R ==========\n")
+
 # Try to run the scripts, if something is wrong, stop the analysis with an error message
 tryCatch(lapply(files.to.load, source),
          error = function(error) {

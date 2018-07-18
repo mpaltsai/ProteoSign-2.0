@@ -39,11 +39,12 @@ experimental.structure.table <- read.csv(experimental.structrure.file,
 if (is.label.free == TRUE) {
   
   # Path to the raw.files.to.condition.matrix file for label free experiments 
-  raw.files.condition.matrix <- paste(here(), "data-input", "rawFilesConditionMatrix.csv", sep = "/")
+  raw.files.condition.matrix <- paste(here(), "data-input", "test-case-maxquant-label-free-cyt.csv", sep = "/")
   
   # Read the raw.files.to.condition.matrix file
   label.free.raw.files.condition.matrix <- read.csv(raw.files.condition.matrix,
-                                                        stringsAsFactors = FALSE)
+                                                        stringsAsFactors = FALSE,
+                                                        check.names = FALSE)
   
   cat("Label-free experiment: raw.files.to.condition.matrix file loaded!\n")
   
@@ -85,6 +86,8 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
   
   # Store it in a global variable
   global.variables[["protein.groups.data"]] <- protein.groups.data
+  
+  cat("========== End of load_data.R ==========\n")
 }
 
 

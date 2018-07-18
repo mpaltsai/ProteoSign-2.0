@@ -1085,22 +1085,19 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
   background_species_lbl<-NA
   
   for(i in 1:length(conditions.labels)){
-    if(PDdata){
-	   if(LabelFree){
-	    if(!IsobaricLabel)
-	    {
+    if (PDdata) {
+	   if (LabelFree) {
+	    if (!IsobaricLabel) {
         mi<-which(grepl(conditions.labels[i], LFQ_conds[, "condition"]))
         mi2<-which(grepl(paste(LFQ_conds[mi,]$raw_file, collapse="|"), evidence[, cond_spec_col]))
         evidence[mi2,]$label_<-conditions.labels[i]
-	    }
-	    else
-	    {
+	    } else {
 	      evidence$label_<-evidence$Modifications
 	    }
-	  }else{
-	  evidence$label_<-evidence$Quan.Channel
+	  } else {
+	    evidence$label_<-evidence$Quan.Channel
 	  }
-    }else{
+    } else {
       if(LabelFree){
         if(!IsobaricLabel){
           mi<-which(grepl(conditions.labels[i], LFQ_conds[, "condition"]))

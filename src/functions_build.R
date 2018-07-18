@@ -14,11 +14,11 @@ assign.condition.to.raw.files <- function(condition, raw.files, conditions.to.ra
   
   #TODO labeled experiments
   
+  # The new element to add
+  condition.to.raw.files <- list()
+  
   # Initialize experimental definition. We have conditions for label-free experiments and labels for labeled experiments
   experimental.definition <- ""
-  
-  # Get the length of the conditions.to.raw.files list
-  conditions.number <- length(conditions.to.raw.files)
   
   # Set the experimental definition depending on the experiment
   if (is.label.free == TRUE) {
@@ -43,7 +43,7 @@ assign.condition.to.raw.files <- function(condition, raw.files, conditions.to.ra
   # 3:  There are raw files assigned to multiple conditions
   # 4:  The condition already exists and the raw files assigned to multiple conditions
   status.code <-    conditions.exists * 1 + 
-    conditions.have.duplicates * 2 + 1
+                    conditions.have.duplicates * 2 + 1
   
   # Print the appropriate error message and terminate the execution
   # or add the new condition with its raw files
@@ -52,7 +52,7 @@ assign.condition.to.raw.files <- function(condition, raw.files, conditions.to.ra
              # 1:  Everything is ok
              
              # Set the new condition and connect it with the raw files 
-             conditions.to.raw.files[[condition]] <- raw.files
+             condition.to.raw.files[[condition]] <- raw.files
            },
            {
              # 2:  The condition already exists
@@ -114,43 +114,46 @@ assign.condition.to.raw.files <- function(condition, raw.files, conditions.to.ra
              stop(message)
            })
   
-  return (conditions.to.raw.files)
+  return (condition.to.raw.files)
 }
 
-build.condition.to.raw.files.from.matrix <- function(raw.files.to.coditions.matrix, conditions.to.raw.files.list, is.label.free) {
+build.condition.to.raw.files.from.matrix <- function(raw.files.to.coditions.matrix, is.label.free) {
   #
   # Builds a conditions.to.raw.files.list from the experimental structure matrix
   #
   # Args:
   #   raw.files.to.coditions.matrix:  The subset matrix of experimental structrure table, 
   #                                   containing only the raw files and condition columns 
-  #   conditions.to.raw.files.list:   The conditions.to.raw.files list to be filled   
   #   is.label.free:                  Boolean, is the analysis label-free or not?
   #
   # Returns:
   #   A new conditions.to.raw.files.list containing the conditions and the raw files that 
   #   belong to each condition
   #
-  
+
+    # Initialize the new conditions.to.raw.files.list
+  conditions.to.raw.files.list <- list()
+
   # Get all the conditions
-  conditions <- raw.files.to.coditions.matrix$conditions
-  
+  conditions <- raw.files.to.coditions.matrix$condition
+
   # Get all the raw.files
   raw.files <-  raw.files.to.coditions.matrix$`raw file`
-  
+
   # Get the unique conditions
   unique.conditions <- unique(conditions)
-  
   # Now for each condition get the raw files that belong to itself
   for (condition in unique.conditions) {
-    raw.files.group.indexes <- which(raw.files.to.coditions.matrix$conditions == condition)
+    raw.files.group.indexes <- which(raw.files.to.coditions.matrix$condition == condition)
     raw.files.group <- raw.files[raw.files.group.indexes]
-    
-    # And add them to the conditions.to.raw.files.list
-    conditions.to.raw.files.list <- assign.condition.to.raw.files(condition, 
+
+    # Make the new element
+    conditions.to.raw.files.element <- assign.condition.to.raw.files(condition, 
                                                                   raw.files.group,
                                                                   conditions.to.raw.files.list,
                                                                   is.label.free)
+
+    conditions.to.raw.files.list <- c(conditions.to.raw.files.list, conditions.to.raw.files.element)
   }
   return (conditions.to.raw.files.list)
 }
@@ -908,11 +911,130 @@ trim.evidence.data.protein.descriptions <- function(evidence.data, protein.descr
   return (new.protein.ids)
 }
 
+add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.compare, conditions.to.raw.files.list,
+                                           evidence.metadata, data.origin, is.label.free, is.isobaric) {
+  #
+  # Adds a condition column to the evidence.data table with the condition name given by the user
+  #
+  # Args:
+  #   evidence.data:                The evidence data table
+  #   conditions.to.compare:        A vector of the conditions to compare e.g. c("Wild", "Mutant")
+  #   conditions.to.raw.files.list: The list of conditions to raw.files
+  #   evidence.metadata:            The evidence metadata regarding the column names for raw.file definition
+  #                                 and condition column definition
+  #   data.origin:                  The origin of the data 'MaxQuant' or 'Proteome-Discoverer'
+  #   is.label.free:                TRUE or FALSE depending on the experiment
+  #   is.isobaric:                  TRUE or FALSE depending on the experiment
+  # 
+  # Returns:
+  #   The altered data.table
+  #
+  
+  # Do the data origin from MaxQuant?
+  origin.is.maxquant <- data.origin == "MaxQuant"
+  
+  # Copy the evidence data in order to dodge the data.table bug
+  evidence.data.reformed <- copy(evidence.data)
+  
+  # Add the new column and initialize it to ''
+  evidence.data.reformed[, "Condition":= ""]
+  
+  # Make the pattern of the conditions that we want to compare
+  conditions.to.compare.pattern <- paste(conditions.to.compare, collapse = "|")
+  
+  # Find the ones to keep e.g. if I have the conditions Mutant1, Mutant2, Wild and 
+  # I want to focus on Mutant1 vs Wild
+  conditions.to.keep <- grepl(conditions.to.compare.pattern,
+                              names(conditions.to.raw.files.list),
+                              perl = TRUE)
+  
+  # Keep only the ones I need
+  trimmed.conditions.to.raw.files.list <- conditions.to.raw.files.list[conditions.to.keep]
+  
+  # Get the names of the conditions
+  trimmed.conditions <- names(trimmed.conditions.to.raw.files.list)
+  
+  # Make a status code for fast comparisons
+  # 1:  # Proteome-Discoverer Isotopic
+  # 2:  # MaxQuant Isotopic
+  # 3:  # Proteome-Discoverer Label-Free
+  # 4:  # MaxQuant Label-Free
+  # 5:  --- Illegal State ---
+  # 6:  # Proteome-Discoverer Isobaric
+  # 7:  # MaxQuant isobaric
+  status.code <-  (origin.is.maxquant * 1) +
+                  (is.label.free * 2) +
+                  (is.isobaric * 3) + 1
+  
+  
+  # TODO maybe for labeled PD the column should be Quan channel
+  # Get the evidence metadata depending on the data origin and the experiment type
+  condition.column <- evidence.metadata$condition
+  
+  # Now add the conditions to the condition column 
+  for (condition in trimmed.conditions) {
+    
+    # Get the raw files
+    condition.raw.files <- trimmed.conditions.to.raw.files.list[[condition]]
+    
+    switch( status.code,
+            { 
+              # Proteome-Discoverer Labeled
+              
+              # Copy the evidence.condition column to the Condition
+              evidence.data.reformed[,Condition := get(condition.column)]
+            },
+            {
+              # MaxQuant Labeled
+              
+              # Copy the evidence.condition column to the Condition
+              evidence.data.reformed[,Condition := get(condition.column)]
+            },
+            {
+              # Proteome-Discoverer label-free
+              condition.raw.files.pattern <- paste(condition.raw.files, collapse = "|")
+              
+              indexes.of.condition <- grepl(condition.raw.files.pattern,
+                                            evidence.data.reformed[, get(condition.column)],
+                                            perl = TRUE)
+              
+              evidence.data.reformed[indexes.of.condition, Condition := condition] 
+            },
+            {
+              cat("Case MaxQuant Label free add compare column\n")
+              
+              # MaxQuant label-free
+              condition.raw.files.pattern <- paste(condition.raw.files, collapse = "|")
+              
+              indexes.of.condition <- grepl(condition.raw.files.pattern,
+                                            evidence.data.reformed[, get(condition.column)],
+                                            perl = TRUE)
+              
+              evidence.data.reformed[indexes.of.condition, Condition := condition] 
+            },
+            {
+              cat("Incorrect case in add.compare.column.to.evidence...\n")
+            },
+            {
+              # Proteome-Discoverer Isobaric
+              evidence.data.reformed[,Condition := get(condition.column)]
+              
+            },
+            {
+             
+              # MaxQuant isobaric
+              evidence.data.reformed[, Condition:=get(condition.column)] 
+            })
+    
+  }
+}
+
 build.analysis.data <- function(protein.groups.data, evidence.data, time.points, data.origin, keep.evidences.ids = TRUE) {
   
   protein.groups.data <- copy(global.variables[["protein.groups.data"]])
   evidence.data <- copy(global.variables[["evidence.data"]])
   is.isobaric <- FALSE
+  is.label.free <- TRUE
   data.origin <- "MaxQuant"
   # Initialize the protein groups column
   protein.groups.column <- ""
@@ -922,7 +1044,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
   
   # Pick the right protein groups column depending on the data origin
   if (data.origin == "Proteome-Discoverer") {
-
+    
     # Explicit handling for the Proteome Discoverer as there are differences between versions
     protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
   } else {
@@ -987,6 +1109,14 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
                               "allow.label.rename" = FALSE,
                               "replicate.multiplexing" = FALSE)
   
-  evidence.metadata <- get.evidence.metadata(colnames(evidence.data), analysis.parameters)
+  evidence.metadata <- get.evidence.metadata(colnames(evidence.data), data.origin, is.label.free, is.isobaric)
+  
+  evidence.data <- add.user.condition.column.to.evidence(evidence.data,
+                                                    conditions.to.compare,
+                                                    conditions.to.raw.files.list,
+                                                    evidence.metadata,
+                                                    data.origin,
+                                                    is.label.free,
+                                                    is.isobaric)
   
 }
