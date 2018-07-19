@@ -1263,14 +1263,15 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
   setwd("..")    
   
   # Bring Labeled or Label-free data to the following common format (table headers):
-  # rep_desc Protein.IDs UniqueSequences.Intensity.condition_1 ... UniqueSequences.Intensity.condition_N Intensity.condition_1 ... Intensity.condition_N
+  # rep_desc Protein.IDs UniqueSequences.Intensity.condition_1 ... UniqueSequences.Intensity.condition_N
+  # Intensity.condition_1 ... Intensity.condition_N
   
   levellog("read.pgroups_v3: Standarizing data format ...")
   if(!PDdata){
     colnames(evidence)[grepl('Peptide.ID',colnames(evidence))]<-'Unique.Sequence.ID'
     if (!IsobaricLabel){
       # colnames(evidence)[grepl('Intensity\\..+',colnames(evidence))]<-conditions.labels
-      colnames(evidence) <- sub('Intensity\\.(.+)', "\\1", colnames(evidence))
+      colnames(evidence) <- sub('Intensity (.+)', "\\1", colnames(evidence))
     }
     # else{
       # evidence[,conditions.labels]<-NA
@@ -1298,29 +1299,39 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
     evidence.dt<-data.table(evidence[, c('Protein.IDs', 'Unique.Sequence.ID', intensityCol,'label_', 'rep_desc')])
     setkey(evidence.dt, rep_desc, Protein.IDs, Unique.Sequence.ID, label_)
     # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
-    suppressWarnings(evidence.dt<-evidence.dt[, .(maxI=max(get(intensityCol), na.rm = T)), by=.(rep_desc, Protein.IDs, Unique.Sequence.ID, label_)][maxI != -Inf])
+    suppressWarnings(evidence.dt<-evidence.dt[, .(maxI=max(get(intensityCol), na.rm = T)),
+                                              by=.(rep_desc, Protein.IDs, Unique.Sequence.ID, label_)][maxI != -Inf])
   }else{
     if(PDdata){
       if (!'Quan.Usage' %in% colnames(evidence) & 'Peptide.Quan.Usage' %in% colnames(evidence)){
         colnames(evidence)[colnames(evidence) == 'Peptide.Quan.Usage'] <- 'Quan.Usage'
       }
-        evidence.dt<-data.table(evidence[, c('Quan.Usage','Protein.IDs', 'Unique.Sequence.ID', conditions.labels,'rep_desc', 'label_')])
+        evidence.dt<-data.table(evidence[, c('Quan.Usage','Protein.IDs', 'Unique.Sequence.ID',
+                                             conditions.labels,'rep_desc', 'label_')])
     }else{
       evidence.dt<-data.table(evidence[, c('Protein.IDs', 'Unique.Sequence.ID', conditions.labels,'rep_desc', 'label_')])
     }
     setkey(evidence.dt, rep_desc, Protein.IDs, Unique.Sequence.ID)    
   }
+  
   ## Calculate identified peptide counts per protein for each condition/label and replicate in the following three steps
-  # 1. For each condition (per sequnce, protein and replicate), set a corresponding column to TRUE if there are > 0 evidence.dt (PSMs) records, FALSE otherwise
-  evidence.dt.seqCounts<-dcast.data.table(evidence.dt[, .(n=.N > 0), by=.(rep_desc, Protein.IDs, Unique.Sequence.ID, label_)], rep_desc + Protein.IDs + Unique.Sequence.ID ~ label_, fill=FALSE)
+  # 1. For each condition (per sequnce, protein and replicate), set a corresponding column to TRUE if there are > 0 
+  # evidence.dt (PSMs) records, FALSE otherwise
+  evidence.dt.seqCounts<-dcast.data.table(evidence.dt[, .(n=.N > 0),
+                                                      by=.(rep_desc, Protein.IDs, Unique.Sequence.ID, label_)],
+                                          rep_desc + Protein.IDs + Unique.Sequence.ID ~ label_, fill=FALSE)
+  
   # 2. Add a column flagging the common, between conditions/labels, sequences.
   # In case of more than two conditions/labels, the flag designates that there are at least two conditions/labels where the peptide is common
   evidence.dt.seqCounts[, 'common' := rowSums(.SD) > 1,.SDcols=conditions.labels]    
+  
   # 3. Collapse the records for each protein (per replicate) and count the TRUEs.
   # evidence.dt[, .(n.Unique.Sequence.IDs=.N), by=.(rep_desc, Protein.IDs)]
   evidence.dt.seqCounts<-evidence.dt.seqCounts[,c(n.Unique.Sequence.IDs=.N,lapply(.SD, function(x){return(length(which(x)))})), by=.(rep_desc,Protein.IDs),.SDcols=c(conditions.labels, 'common')]
+  
   # 4. Calculate the percentage columns
   evidence.dt.seqCounts[, paste0(conditions.labels,'p') := lapply(.SD, function(x){return((x/sum(.SD))*100)}), by=.(rep_desc,Protein.IDs),.SDcols=c(conditions.labels)]
+  
   ## Rename the peptide counts columns
   setnames(evidence.dt.seqCounts,colnames(evidence.dt.seqCounts)[which(colnames(evidence.dt.seqCounts) %in% conditions.labels)],paste('UniqueSequences',conditions.labels,sep='.'))    
   ## Calculate the protein intensity = (sum of unique peptide intensities) for each condition/label and replicate in the following two steps
@@ -1425,7 +1436,8 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
   setwd("..")
   
   ## Cast the table to the following format
-  # Protein.IDs Intensity.[<rep_desc_X>.<label/condition_Y> ...] [<rep_desc_X>.Ratio.counts ...] [<rep_desc_X>.uniqueSequences ...] time.point [<label/condition_Y> ...] [<label/condition_Y>p ...]
+  # Protein.IDs Intensity.[<rep_desc_X>.<label/condition_Y> ...] [<rep_desc_X>.Ratio.counts ...]
+  #[<rep_desc_X>.uniqueSequences ...] time.point [<label/condition_Y> ...] [<label/condition_Y>p ...]
   
   ## Step 1: For each 'rep_desc', add to a growing dataframe the evidence.dt data, renaming the columns accordingly
   # Also, calculate the missing columns required by the target format and drop the unnecessary columns

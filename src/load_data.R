@@ -32,8 +32,11 @@ cat("Reading experimental structure file...\n")
 
 # Read the experimental structure file
 experimental.structure.table <- read.csv(experimental.structrure.file,
-                                         stringsAsFactors = FALSE)
+                                         stringsAsFactors = FALSE,
+                                         check.names = FALSE)
 
+# Lowercase all the columns
+colnames(experimental.structure.table) <- tolower(colnames(experimental.structure.table))
 
 # Load the raw-file-to-condition matrix for label free experiments 
 if (is.label.free == TRUE) {

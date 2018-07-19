@@ -3,3 +3,5 @@
 
 # Make the limma output folder
 make.limma.folder()
+
+make.Venn.diagram(evidence.data)

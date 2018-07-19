@@ -18,7 +18,7 @@ rm(list = grep(paste(c("^global.variables",
 experimental.structure <- global.variables[["experimental.structure"]]
 
 # Order the experimental structure by raw.file name
-experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
+experimental.structure <- experimental.structure[order(experimental.structure$"raw file"),]
 
 # Initialize conditions.to.raw.files list
 conditions.to.raw.files.list <- list()
@@ -27,7 +27,7 @@ conditions.to.raw.files.list <- list()
 raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
 
 # Order the raw.files.condition.matrix structure by raw.file name
-raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$`raw file`),]
+raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$"raw file"),]
 
 
 # Build the conditions.to.raw.files list from the experimental structure matrix
@@ -37,41 +37,7 @@ conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.
 # The conditions that we want to focus on
 conditions.to.compare <- names(conditions.to.raw.files.list)
 
-# Add them in the global.variables list
-global.variables[["conditions.to.compare"]] <- conditions.to.compare
-# Clear enviroment and only keep functions and global/project variables
-rm(list = grep(paste(c("^global.variables",
-                       "^project.variables",
-                       lsf.str()),
-                     collapse = "|"),
-               ls(),
-               value = TRUE,
-               invert = TRUE))
-
-# Read the experimental structure from the global variables list
-experimental.structure <- global.variables[["experimental.structure"]]
-
-# Order the experimental structure by raw.file name
-experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
-
-# Initialize conditions.to.raw.files list
-conditions.to.raw.files.list <- list()
-
-# Get the raw.files.condition.matrix
-raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
-
-# Order the raw.files.condition.matrix structure by raw.file name
-raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$`raw file`),]
-
-
-# Build the conditions.to.raw.files list from the experimental structure matrix
-conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
-                                                                            is.label.free = TRUE)
-
-# The conditions that we want to focus on
-conditions.to.compare <- c("WT", "MT1")
-
-# Add them in the global.variables list
+# COMBAK Add them in the global.variables list [should choose 2!]
 global.variables[["conditions.to.compare"]] <- conditions.to.compare
 
 # Add conditions.to.raw.files.list to the global variables list
@@ -85,16 +51,16 @@ experimental.structure$condition <- raw.files.condition.matrix$condition
 # /technical replicates/ fractions
 experimental.structure <- experimental.structure[
   order(experimental.structure$condition,
-        experimental.structure$biological.replicate,
-        experimental.structure$technical.replicate,
+        experimental.structure$"biological replicate",
+        experimental.structure$"technical replicate",
         experimental.structure$fraction), ]
 
 # Correct the rownames
-rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
+rownames(experimental.structure) <- c(1:length(experimental.structure$"raw file"))
 
 # Store each column on a separate variable
-biological.replicates.list <- experimental.structure$biological.replicate
-technical.replicates.list <- experimental.structure$technical.replicate
+biological.replicates.list <- experimental.structure$"biological replicate"
+technical.replicates.list <- experimental.structure$"technical replicate"
 fraction.list <- experimental.structure$fraction
 experimental.conditions.list <- experimental.structure$condition
 
@@ -145,10 +111,10 @@ biological.replicates.list <- restored.replicates$biological.replicates
 technical.replicates.list <- restored.replicates$technical.replicates
 
 # Restore the biological column on the experimenta structure file
-experimental.structure$biological.replicate <- biological.replicates.list
+experimental.structure$"biological replicate" <- biological.replicates.list
 
 # Restore the technical column on the experimenta structure file
-experimental.structure$technical.replicate <- technical.replicates.list
+experimental.structure$"technical replicate" <- technical.replicates.list
 
 # Now exploit the check.number.of.replicates to find if there are
 # replicates of each type in our experiment and construct the setup id
@@ -185,12 +151,12 @@ global.variables[["experimental.structure"]] <- experimental.structure
 
 # Store max biological replicates for duplicates handling from limma
 global.variables[["max.biological.replicates"]] <- experimental.structure[,
-                                                                          which.max(biological.replicate)]
+                                                                          which.max(`biological replicate`)]
 
 # Store the minimum number of technical replicates
 global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
-                                                           .SD[which.max(technical.replicate)],
-                                                           by = biological.replicate]$technical.replicate)
+                                                           .SD[which.max(`technical replicate`)],
+                                                           by = biological.replicate]$"technical replicate")
 
 cat("========== End of build.R ==========\n")
 
