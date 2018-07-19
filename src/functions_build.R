@@ -1106,16 +1106,68 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is) {
   switch( status.code,
           {
           # 1:  Proteome-Discoverer Labeled
+            
           },
           {
           # 2:  MaxQuant Labeled
           
           },
-          {# 3:  Proteome-Discoverer Label-free
-           
           {
-          # 4:  MaxQuant Label-free
-          })
+            # 3:  Proteome-Discoverer Label-free
+            
+            # TODO Here we should use Precursor Area is unfortunately buggy (sometimes 0/NA), so we are
+            # left with Intensity to work with. 
+            # intensity.column <- "Precursor Area"            
+            intensity.column <- "Intensity"
+            
+            evidence.data.subset <- evidence.data[, .SD, .SDcols = c("Protein IDs",
+                                                                "Unique Sequence ID",
+                                                                intensity.column,
+                                                                "Condition",
+                                                                "description")]
+            
+            setkey(evidence.data.subset,
+                   description,
+                   "Protein IDs",
+                   "Unique Sequence ID",
+                   Condition)
+            
+            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            evidence.data.subset <- evidence.data.subset[, 
+                                                         .("Max Intensity" = max(get(intensity.column),
+                                                                                 na.rm = TRUE)),
+                                                         by=.(description,
+                                                              `Protein IDs`,
+                                                              `Unique Sequence ID`,
+                                                              Condition)]
+          {
+            # 4:  MaxQuant Label-free
+            
+            intensity.column <- "Intensity"
+            
+            evidence.data.subset <- evidence.data[, .SD,
+                                                    .SDcols = c("Protein IDs",
+                                                                  "Unique Sequence ID",
+                                                                  intensity.column,
+                                                                  "Condition",
+                                                                  "description")]
+            
+            evidence.data.subset <- na.omit(evidence.data.subset, "Intensity")
+            
+            setkey(evidence.data.subset,
+                   description,
+                   "Protein IDs",
+                   "Unique Sequence ID",
+                   Condition)
+            
+            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            evidence.data.subset <- evidence.data.subset[, 
+                                                         .("Max Intensity" = max(get(intensity.column), na.rm = TRUE)),
+                                                          by=.(description,
+                                                               `Protein IDs`,
+                                                               `Unique Sequence ID`,
+                                                               Condition)]
+            })
 }
   
 build.analysis.data <- function(protein.groups.data, evidence.data, time.points, data.origin, keep.evidences.ids = TRUE) {
