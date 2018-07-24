@@ -1282,7 +1282,7 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
     # }
     
   }
-  if (!'Unique.Sequence.ID' %in% colnames(evidence)){
+  if (! 'Unique.Sequence.ID' %in% colnames(evidence)){
     if ('Annotated.Sequence' %in% colnames(evidence)){
       colnames(evidence)[colnames(evidence) == 'Annotated.Sequence'] <- 'Unique.Sequence.ID'
       evidence$Unique.Sequence.ID <- sub(".*?\\.(.*?)\\..*", "\\1", evidence$Unique.Sequence.ID)
@@ -1322,30 +1322,44 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
                                           rep_desc + Protein.IDs + Unique.Sequence.ID ~ label_, fill=FALSE)
   
   # 2. Add a column flagging the common, between conditions/labels, sequences.
-  # In case of more than two conditions/labels, the flag designates that there are at least two conditions/labels where the peptide is common
+  # In case of more than two conditions/labels, the flag designates that there are at 
+  # least two conditions/labels where the peptide is common
   evidence.dt.seqCounts[, 'common' := rowSums(.SD) > 1,.SDcols=conditions.labels]    
   
   # 3. Collapse the records for each protein (per replicate) and count the TRUEs.
   # evidence.dt[, .(n.Unique.Sequence.IDs=.N), by=.(rep_desc, Protein.IDs)]
-  evidence.dt.seqCounts<-evidence.dt.seqCounts[,c(n.Unique.Sequence.IDs=.N,lapply(.SD, function(x){return(length(which(x)))})), by=.(rep_desc,Protein.IDs),.SDcols=c(conditions.labels, 'common')]
+  evidence.dt.seqCounts<-evidence.dt.seqCounts[,
+                                               c(n.Unique.Sequence.IDs=.N,
+                                                 lapply(.SD, 
+                                                        function(x){
+                                                          return(length(which(x)))})),
+                                               by=.(rep_desc,Protein.IDs),
+                                               .SDcols=c(conditions.labels, 'common')]
   
   # 4. Calculate the percentage columns
   evidence.dt.seqCounts[, paste0(conditions.labels,'p') := lapply(.SD, function(x){return((x/sum(.SD))*100)}), by=.(rep_desc,Protein.IDs),.SDcols=c(conditions.labels)]
   
   ## Rename the peptide counts columns
-  setnames(evidence.dt.seqCounts,colnames(evidence.dt.seqCounts)[which(colnames(evidence.dt.seqCounts) %in% conditions.labels)],paste('UniqueSequences',conditions.labels,sep='.'))    
-  ## Calculate the protein intensity = (sum of unique peptide intensities) for each condition/label and replicate in the following two steps
+  setnames(evidence.dt.seqCounts,
+           colnames(evidence.dt.seqCounts)[which(colnames(evidence.dt.seqCounts) %in% conditions.labels)],
+           paste('UniqueSequences',
+                 conditions.labels,
+                 sep='.'))    
+  ## Calculate the protein intensity = (sum of unique peptide intensities) for each condition/label and 
+  # replicate in the following two steps
   if(LabelFree){
     # 1. Cast the data so that we have columns for each label and intensity separately
     evidence.dt<-dcast.data.table(evidence.dt, rep_desc + Protein.IDs + Unique.Sequence.ID ~ label_, fill=0)    
   }else{
     if(PDdata){
       # 1. Take the (Quan.Usage == 'Used') records and for each peptide keep only the PSM record with the highest intensity
-      evidence.dt<-evidence.dt[Quan.Usage == 'Used' | Quan.Usage == 'Use', lapply(.SD, max), by=.(rep_desc, Protein.IDs, Unique.Sequence.ID), .SDcols=conditions.labels]    
+      evidence.dt<-evidence.dt[Quan.Usage == 'Used' | Quan.Usage == 'Use', lapply(.SD, max),
+                               by=.(rep_desc, Protein.IDs, Unique.Sequence.ID), .SDcols=conditions.labels]    
     }else{
       # 2. Take the records with Intensity != NA across labels/conditions and for each peptide keep only the PSM record with the highest intensity
       evidence.dt[, sumI := rowSums(.SD, na.rm = T), .SDcols=conditions.labels]
-      evidence.dt<-evidence.dt[sumI > 0, lapply(.SD, max), by=.(rep_desc, Protein.IDs, Unique.Sequence.ID), .SDcols=conditions.labels]    
+      evidence.dt<-evidence.dt[sumI > 0, lapply(.SD, max), by=.(rep_desc, Protein.IDs, Unique.Sequence.ID),
+                               .SDcols=conditions.labels]    
       evidence.dt[, sumI := NULL]
     }
   }

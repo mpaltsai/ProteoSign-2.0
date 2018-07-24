@@ -1067,24 +1067,56 @@ clear.user.condition.na.rows <- function(evidence.data) {
   return (clear.evidence.data)
 }
 
-bring.data.to.common.format <- function(evidence.data, data.origin, is) {
+bring.data.to.common.format <- function(evidence.data, data.origin, is.label.free, is.isobaric) {
+  #
+  # Bring both evidence files from MaxQuant or Proteome-Discoverer to a common format for analysis
+  #
+  # Args:
+  #   evidence.data:  The evidence.data data.table
+  #   data.origin:    Where the data come from, 'MaxQuant' or 'Proteome-Dsicoverer'
+  #   is.label.free:  TRUE or FALSE depending on the experiment
+  #   is.isobaric:    TRUE or FALSE depending on the experiment
+  #
+  # Returns:
+  #   The subset of the evidence.data table
+  #
   
+  # Copy the evidence.data
   evidence.data <- copy(evidence.data)
   
+  # Get the evidence columns
+  evidence.columns <- colnames(evidence.data)
+  
+  # If data come from the MaxQuant  rename the 'Peptide ID' to 'Unique Sequence ID'
+  # If data come form Proteome-Discoverer the column maybe already exists
   if (data.origin == "MaxQuant") {
-    if ("Peptide ID" %in% colnames(evidence.data) == TRUE) {
+    if ("Peptide ID" %in% evidence.columns == TRUE) {
       setnames(evidence.data,"Peptide ID", "Unique Sequence ID")
     }
+    
+    # Renew the evidence columns vector
+    evidence.columns <- colnames(evidence.data)
+    
+    # Clean 'Intensity' part from 'Intensity XYZ' columns
     # Not sure...
     if (is.isobaric == FALSE) {
       colnames(evidence.data) <- sub('Intensity (.+)',
                                      "\\1",
-                                     colnames(evidence.data),
+                                     evidence.columns,
                                      perl = TRUE)
+    } else {
+      # yorgodilo had something commented here...
     }
   }
-  if ("Unique Sequence ID" %in% colnames(evidence.data) == FALSE &
-      "Annotated Sequence" %in% colnames(evidence.data) == TRUE) {
+  
+  # Renew the evidence columns vector
+  evidence.columns <- colnames(evidence.data)
+  
+  # If data come form Proteome-Discoverer and the the column 'Unique Sequence ID'
+  # still does not exist, rename the 'Annotated Sequence'
+  # Not sure...
+  if ("Unique Sequence ID" %in% evidence.columns == FALSE &
+      "Annotated Sequence" %in% evidence.columns == TRUE) {
     
     setnames(evidence.data,"Annotated Sequence", "Unique Sequence ID")
     evidence[, "Unique Sequence ID" := sub(".*? (.*?) .*",
@@ -1092,6 +1124,18 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is) {
                                            evidence$"Unique Sequence ID")]
   }
   
+  # TODO check with real data!
+  evidence.columns <- colnames(evidence.data)
+  
+  if ("Quan Usage" %in% evidence.columns == FALSE &
+      "Peptide Quan Usage" %in% evidence.columns == TRUE) {
+    setnames(evidence.data, "Peptide Quan Usage", "Quan Usage")
+  }
+  
+  # Renew the evidence columns vector
+  evidence.columns <- colnames(evidence.data)
+  
+  # Do the data come from MaxQuant?
   origin.is.maxquant <- data.origin == "MaxQuant"
   
   
@@ -1099,18 +1143,40 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is) {
   # 2:  MaxQuant Labeled
   # 3:  Proteome-Discoverer Label-free
   # 4:  MaxQuant Label-free
-  
+  # Make a status code for fast case evaluation
   status.code <-  (origin.is.maxquant * 1) +
                   (is.label.free * 2) + 1
   
   switch( status.code,
           {
-          # 1:  Proteome-Discoverer Labeled
-            
+            # 1:  Proteome-Discoverer Labeled
+            # TODO
+            evidence.data.subset <- evidence.data[, .SD,
+                                                    .SDcols = c("Quan Usage",
+                                                                "Protein IDs",
+                                                                "Unique Sequence ID",
+                                                                intensity.columns,
+                                                                "Condition",
+                                                                "description")]
+          
+            setkey(evidence.data.subset, 
+                   "description",
+                   "Protein IDs",
+                   "Unique Sequence ID")  
           },
           {
           # 2:  MaxQuant Labeled
-          
+            evidence.data.subset <- evidence.data[, .SD,
+                                                  .SDcols = c("Protein IDs",
+                                                              "Unique Sequence ID",
+                                                              intensity.columns,
+                                                              "Condition",
+                                                              "description")]
+            
+            setkey(evidence.data.subset, 
+                   "description",
+                   "Protein IDs",
+                   "Unique Sequence ID")    
           },
           {
             # 3:  Proteome-Discoverer Label-free
@@ -1140,6 +1206,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is) {
                                                               `Protein IDs`,
                                                               `Unique Sequence ID`,
                                                               Condition)]
+          },
           {
             # 4:  MaxQuant Label-free
             
@@ -1168,15 +1235,27 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is) {
                                                                `Unique Sequence ID`,
                                                                Condition)]
             })
+  
+  return (evidence.data.subset)
 }
   
-build.analysis.data <- function(protein.groups.data, evidence.data, time.points, data.origin, keep.evidences.ids = TRUE) {
+build.analysis.data <- function(protein.groups.data, evidence.data, data.origin, is.isobaric, is.label.free) {
+  #
+  # Combines the information from "protein.groups.data" and the "evidence.data" tables in one matrix,
+  # depending on the experimenta set up and transforms in in a common format
+  #
+  # Args:
+  #   protein.groups.data:  The proteinGroups.txt file from the MaxQuant or NULL if data comes from Proteome-Discoverer
+  #   evidence.data:        The evidence.txt data.table for data coming from the MaxQuant
+  #                         or the PSM file data.table for data coming from the Proteome Discoverer
+  #   data.origin:          String, "MaxQuant" or "Proteome-Discoverer" depending on the data source
+  #   is.isobaric:          TRUE or FALSE depending on the experiment
+  #   is.label.free:        TRUE or FALSE depending on the experiment
+  #
+  # Returns:
+  #   A tranformed data.table with only the needed column for the analysis
+  #
   
-  protein.groups.data <- copy(global.variables[["protein.groups.data"]])
-  evidence.data <- copy(global.variables[["evidence.data"]])
-  is.isobaric <- FALSE
-  is.label.free <- TRUE
-  data.origin <- "MaxQuant"
   # Initialize the protein groups column
   protein.groups.column <- ""
   
@@ -1265,5 +1344,10 @@ build.analysis.data <- function(protein.groups.data, evidence.data, time.points,
                          by.x = c(evidence.metadata$raw.file),
                          by.y = c("raw file"))
   
-  bring.data.to.common.format(evidence.data)
+  # Finally prepare the evidence to have a common format across experimental setups
+  evidence.data <- bring.data.to.common.format( evidence.data,
+                                                data.origin,
+                                                is.label.free,
+                                                is.isobaric)
+  return (evidence.data) 
 }

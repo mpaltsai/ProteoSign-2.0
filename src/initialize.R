@@ -4,10 +4,11 @@
 # Clear enviroment
 rm(list = grep("^project.variables|^check.packages", ls(), value = TRUE, invert = TRUE))
 
-global.variables <- list("quantitation.type" =              "Proteins",
-                         "replicate.multiplexing.is.used" =  FALSE,
-                         "dataset.origin" =                  "MaxQuant",
-                         "is.label.free" =                   TRUE)
+global.variables <- list("quantitation.type"              = "Proteins",
+                         "replicate.multiplexing.is.used" = FALSE,
+                         "dataset.origin"                 = "MaxQuant",
+                         "is.label.free"                  = TRUE,
+                         "is.isobaric"                    = FALSE)
 
 
 # Project Packages to be installed

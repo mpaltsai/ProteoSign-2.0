@@ -156,7 +156,47 @@ global.variables[["max.biological.replicates"]] <- experimental.structure[,
 # Store the minimum number of technical replicates
 global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(`technical replicate`)],
-                                                           by = biological.replicate]$"technical replicate")
+                                                           by = `biological replicate`]$"technical replicate")
+
+# Now build the analysis data 
+analysis.data <- build.analysis.data(protein.groups.data = global.variables$protein.groups.data,
+                                     evidence.data       = global.variables$evidence.data,
+                                     data.origin         = global.variables$dataset.origin,
+                                     is.label.free       = global.variables$is.label.free,
+                                     is.isobaric         = FALSE)
+
+
+global.variables[["analysis.data"]] <- analysis.data
+
+
+evidence.truth.table <- dcast.data.table(analysis.data[, .(n=.N > 0),
+                                                    by=.(`description`,
+                                                          `Protein IDs`,
+                                                         `Unique Sequence ID`,
+                                                         `Condition`)],
+                                         `description` + `Protein IDs` + `Unique Sequence ID` ~ `Condition`,
+                                         fill = FALSE)
+
+evidence.truth.table[,
+                      "Shared Peptide" := rowSums(.SD) == 2,
+                      .SDcols=global.variables$conditions.to.compare]
+
+evidence.truth.table2 <-  evidence.truth.table[,
+                                               lapply(.SD, 
+                                                      function(x){
+                                                        return(length(which(x)))}),
+                                               by=.(`description`,
+                                                    `Protein IDs`),
+                                               .SDcols=c(global.variables$conditions.to.compare,
+                                                       "Shared Peptide")]
+
+evidence.truth.table2[, paste0(global.variables$conditions.to.compare,'p') := lapply(.SD,
+                                                                function(x){
+                                                                  return((x/sum(.SD))*100)
+                                                                  }),
+                      by=.(`description`,
+                           `Protein IDs`),
+                      .SDcols=c(global.variables$conditions.to.compare)]
 
 cat("========== End of build.R ==========\n")
 
