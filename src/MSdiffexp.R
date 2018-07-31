@@ -1375,7 +1375,8 @@ read.pgroups_v3<-function(fname,evidence_fname,time.point,keepEvidenceIDs=F){
     minI<-tmp.I[1]
   }
   
-  ## If enabled, do filter out peptides where all 'channels' except filterL_lbl channel have noise-level intensity (peptide-level filtering)
+  ## If enabled, do filter out peptides where all 'channels' except filterL_lbl channel have noise-level
+  # intensity (peptide-level filtering)
   if(filterL && filterL_lvl){
     evidence.dt[, minIcount := rowSums(.SD == minI), .SDcols=conditions.labels[! conditions.labels %in% filterL_lbl]]
     n1<-nrow(evidence.dt)

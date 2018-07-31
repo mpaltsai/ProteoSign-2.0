@@ -168,35 +168,19 @@ analysis.data <- build.analysis.data(protein.groups.data = global.variables$prot
 
 global.variables[["analysis.data"]] <- analysis.data
 
+cat("after analysis data\n")
 
-evidence.truth.table <- dcast.data.table(analysis.data[, .(n=.N > 0),
+analysis.data <- dcast.data.table(analysis.data[, 
                                                     by=.(`description`,
                                                           `Protein IDs`,
                                                          `Unique Sequence ID`,
                                                          `Condition`)],
                                          `description` + `Protein IDs` + `Unique Sequence ID` ~ `Condition`,
-                                         fill = FALSE)
+                                         value.var = "Max Intensity",
+                                         fill = NA)
 
-evidence.truth.table[,
-                      "Shared Peptide" := rowSums(.SD) == 2,
-                      .SDcols=global.variables$conditions.to.compare]
-
-evidence.truth.table2 <-  evidence.truth.table[,
-                                               lapply(.SD, 
-                                                      function(x){
-                                                        return(length(which(x)))}),
-                                               by=.(`description`,
-                                                    `Protein IDs`),
-                                               .SDcols=c(global.variables$conditions.to.compare,
-                                                       "Shared Peptide")]
-
-evidence.truth.table2[, paste0(global.variables$conditions.to.compare,'p') := lapply(.SD,
-                                                                function(x){
-                                                                  return((x/sum(.SD))*100)
-                                                                  }),
-                      by=.(`description`,
-                           `Protein IDs`),
-                      .SDcols=c(global.variables$conditions.to.compare)]
+# Keep only the peptides that were present in both conditions
+analysis.data <- na.omit(analysis.data, cols = conditions.to.compare)
 
 cat("========== End of build.R ==========\n")
 

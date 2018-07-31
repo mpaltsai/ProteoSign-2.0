@@ -1200,8 +1200,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
-                                                         .("Max Intensity" = max(get(intensity.column),
-                                                                                 na.rm = TRUE)),
+                                                         .("Max Intensity" = list(get(intensity.column))),
                                                          by=.(description,
                                                               `Protein IDs`,
                                                               `Unique Sequence ID`,
@@ -1219,7 +1218,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
                                                                   "Condition",
                                                                   "description")]
             
-            evidence.data.subset <- na.omit(evidence.data.subset, "Intensity")
+            # evidence.data.subset <- na.omit(evidence.data.subset, "Intensity")
             
             setkey(evidence.data.subset,
                    description,
@@ -1229,7 +1228,8 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
-                                                         .("Max Intensity" = max(get(intensity.column), na.rm = TRUE)),
+                                                         # .("Test Intensities" = list(get(intensity.column))),
+                                                         .("Max Intensity" = paste(get(intensity.column), collapse = ";")),
                                                           by=.(description,
                                                                `Protein IDs`,
                                                                `Unique Sequence ID`,
@@ -1335,8 +1335,8 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                     is.label.free,
                                                     is.isobaric)
   
-  # Clear the data from the rows with unassigned condition
-  evidence.data <- clear.user.condition.na.rows(evidence.data)
+  # # Clear the data from the rows with unassigned condition
+  # evidence.data <- clear.user.condition.na.rows(evidence.data)
   
   
   evidence.data <- merge(evidence.data,
@@ -1349,5 +1349,6 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                 data.origin,
                                                 is.label.free,
                                                 is.isobaric)
+  
   return (evidence.data) 
 }

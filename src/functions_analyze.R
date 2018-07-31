@@ -135,3 +135,32 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.tit
   # And finally reset the working directory to the scripts folder
   setwd(here("src"))  
 }
+
+filter.out.reverse.and.contaminants <- function(analysis.data) {
+  #
+  # Removes Contamintants and Reverse flagged peptides from the evidence data
+  # 
+  # Args:
+  #   analysis.data: The analysis.data 
+  #
+  # Returns:
+  #   The cleaned analysis.data data.table
+  #
+  
+  # Copy the analysis data
+  data <- copy(analysis.data)
+  
+  # Clean them from the Protein IDs starting with CON__ regarding the contaminants
+  data.no.contaminants <- subset( data,
+                                  grepl("^CON__",
+                                        `Protein IDs`,
+                                        perl = TRUE) == FALSE)
+  
+  # Clean them from the Protein IDs starting with REV__ regarding the Reverse sequences
+  data.no.contaminants.no.reverse <- subset(data.no.contaminants,
+                                            grepl("^REV__",
+                                            `Protein IDs`,
+                                            perl = TRUE) == FALSE)
+  
+  return (data.no.contaminants.no.reverse)
+}
