@@ -14,6 +14,10 @@ rm(list = grep(paste(c("^global.variables",
                value = TRUE,
                invert = TRUE))
 
+# Return the memory to the OS
+gc(verbose = FALSE,
+   reset = TRUE) 
+
 # Read the experimental structure from the global variables list
 experimental.structure <- global.variables[["experimental.structure"]]
 
@@ -165,22 +169,31 @@ analysis.data <- build.analysis.data(protein.groups.data = global.variables$prot
                                      is.label.free       = global.variables$is.label.free,
                                      is.isobaric         = FALSE)
 
-
+# Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
 
 cat("after analysis data\n")
 
+# Cast the multiline conditions to 2 columns Condition1 Condition2 with their peptides' intensities
 analysis.data <- dcast.data.table(analysis.data[, 
                                                     by=.(`description`,
                                                           `Protein IDs`,
                                                          `Unique Sequence ID`,
                                                          `Condition`)],
                                          `description` + `Protein IDs` + `Unique Sequence ID` ~ `Condition`,
-                                         value.var = "Max Intensity",
+                                         value.var = "Intensities",
                                          fill = NA)
 
 # Keep only the peptides that were present in both conditions
 analysis.data <- na.omit(analysis.data, cols = conditions.to.compare)
+
+# Store the data in a global variable
+global.variables[["analysis.data"]] <- analysis.data
+
+# Remove useless data
+global.variables[["evidence.data"]] <- NULL
+
+global.variables[["protein.groups.data"]] <- NULL
 
 cat("========== End of build.R ==========\n")
 

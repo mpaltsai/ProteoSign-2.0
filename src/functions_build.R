@@ -511,7 +511,7 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
                                               experimental.description.technical,
                                               experimental.description.fractions)
          })
-  cat(experimental.description,"\n")
+  
   return (experimental.description)
 }
 
@@ -607,10 +607,14 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
                                                             "Evidence IDs")]
   # Break the each Evidence IDs cell in multiple by the ';' and merge them by their corresponding Protein ID and
   # Protein Name
-  protein.groups.subset.multiline.evidence <- protein.groups.subset[ ,
-                                                                     list(`Evidence IDs` = unlist(strsplit(`Evidence IDs`,
-                                                                                                            ";"))),
-                                                                     by = list(`Protein IDs`, `Protein Names`)]
+  
+  protein.groups.subset.multiline.evidence <- cSplit(protein.groups.subset, "Evidence IDs", ";", "long")
+  # My old implementation, but cSplit did the job faster!
+  # protein.groups.subset.multiline.evidence <- protein.groups.subset[ ,
+  #                                                                    list(`Evidence IDs` = unlist(strsplit(`Evidence IDs`,
+  #                                                                                                           ";"))),
+  #                                                                    by = list(`Protein IDs`, `Protein Names`)]
+ 
   # Rename Evidence IDs column to ID in the multiple evidence table
   setnames(protein.groups.subset.multiline.evidence,
            "Evidence IDs",
@@ -641,7 +645,7 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   #   3:  Remove Protein Names
   #   4   Remove Protein IDs and Protein Names
   #
-  
+  cat(date(), "0\n")
   switch(column.delete.case,
          cat("No need for column deletion...\n"),
          evidence.data[, "Protein IDs" := NULL],
@@ -650,22 +654,13 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   
   # Reset the column names of the evidence file
   evidence.column.names <- colnames(evidence.data)
-
-    # Join the multiline protein groups table with the evidence table in order to
+ 
+  # Join the multiline protein groups table with the evidence table in order to
   # make the data.table that we should have in the first place
-  merged.evidence.table <- merge(protein.groups.subset.multiline.evidence, evidence.data, by = "ID")
-
-    # TODO Should go to analyze.R and add Only identified by site
-  # merged.evidence.table.columns <- colnames(merged.evidence.table)
-  # if("Contaminant" %in% merged.evidence.table.columns){
-  #   setkey(merged.evidence.table, Contaminant)
-  #   merged.evidence.table <- merged.evidence.table[!"+"]
-  # }
-  # 
-  # if("Reverse" %in% merged.evidence.table.columns){
-  #   setkey(merged.evidence.table, Reverse)
-  #   merged.evidence.table <- merged.evidence.table[!"+"]
-  # }
+  merged.evidence.table <- merge(protein.groups.subset.multiline.evidence,
+                                 evidence.data,
+                                 by = "ID",
+                                 all = TRUE)
   
   # Order the corrected evidence data.table by id
   setkey(merged.evidence.table, ID)
@@ -883,7 +878,6 @@ trim.evidence.data.protein.descriptions <- function(evidence.data, protein.descr
   # Set the key to Protein IDs for later merging
   setkey(protein.occurences, "Protein IDs")
   
-  
   # Now paste the columns Protein IDs/ Description and separate them with a ' ['
   evidence.subset[, 
                   "Trimmed Protein Description" := do.call( paste,
@@ -906,7 +900,7 @@ trim.evidence.data.protein.descriptions <- function(evidence.data, protein.descr
                                                                "]...",
                                                                sep = "")), 
                   .SDcols = "Trimmed Protein Description"]
-  
+
   # Order the table and get the trimmed protein descriptions
   new.protein.ids <- protein.occurences[evidence.subset][order(index), `Trimmed Protein Description`]
   
@@ -1005,6 +999,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               evidence.data.reformed[indexes.of.condition, Condition := condition] 
             },
             {
+              
               cat("Case MaxQuant Label free add compare column\n")
               
               # MaxQuant label-free
@@ -1200,7 +1195,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
-                                                         .("Max Intensity" = list(get(intensity.column))),
+                                                         .("Intensities" = paste(get(intensity.column), collapse = ";")),
                                                          by=.(description,
                                                               `Protein IDs`,
                                                               `Unique Sequence ID`,
@@ -1227,13 +1222,18 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
                    Condition)
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            cat(date(),"6\n")
+            test.data <<- evidence.data.subset
+            
             evidence.data.subset <- evidence.data.subset[, 
                                                          # .("Test Intensities" = list(get(intensity.column))),
-                                                         .("Max Intensity" = paste(get(intensity.column), collapse = ";")),
+                                                         .("Intensities" = paste(get(intensity.column), collapse = ";")),
                                                           by=.(description,
                                                                `Protein IDs`,
                                                                `Unique Sequence ID`,
                                                                Condition)]
+            cat(date(),"7\n")
+            stop("peos")
             })
   
   return (evidence.data.subset)
@@ -1316,16 +1316,15 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
       evidence.data[, `Protein Descriptions` := ""]
     }
   }
-  
+
   # Paste and trim the evidence protein ids  with the appropriate protein description column
   # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
   evidence.data$`Protein IDs` <- trim.evidence.data.protein.descriptions(evidence.data,
                                                                          protein.description.column)
-  
-  
+  cat(date(),"1 \n")
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data), data.origin, is.label.free, is.isobaric)
-  
+  cat(date(),"2 \n")
   # Add a column with the user defined condition to compare
   evidence.data <- add.user.condition.column.to.evidence(evidence.data,
                                                     conditions.to.compare,
@@ -1338,17 +1337,17 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   # # Clear the data from the rows with unassigned condition
   # evidence.data <- clear.user.condition.na.rows(evidence.data)
   
-  
+  cat(date(),"3 \n")
   evidence.data <- merge(evidence.data,
                          global.variables$experimental.structure,
                          by.x = c(evidence.metadata$raw.file),
                          by.y = c("raw file"))
-  
+  cat(date(),"4 \n")
   # Finally prepare the evidence to have a common format across experimental setups
   evidence.data <- bring.data.to.common.format( evidence.data,
                                                 data.origin,
                                                 is.label.free,
                                                 is.isobaric)
-  
+  cat(date(),"5\n")
   return (evidence.data) 
 }

@@ -1,9 +1,19 @@
 # This file loads all the packages,libraries and data needed regarding the
 # workspace, loads the functions.R script and sets the global variables.
 
-# Clear enviroment
-rm(list = grep("^project.variables|^check.packages", ls(), value = TRUE, invert = TRUE))
+cat(date(),"Start \n")
 
+# Clear enviroment
+rm(list = grep("^project.variables|^check.packages",
+               ls(),
+               value = TRUE,
+               invert = TRUE))
+
+# Return the memory to the OS
+gc(verbose = FALSE,
+   reset = TRUE)  
+
+# Make a list with the global variables that I want top use
 global.variables <- list("quantitation.type"              = "Proteins",
                          "replicate.multiplexing.is.used" = FALSE,
                          "dataset.origin"                 = "MaxQuant",
@@ -12,7 +22,10 @@ global.variables <- list("quantitation.type"              = "Proteins",
 
 
 # Project Packages to be installed
-cran.packages <- c("data.table", "VennDiagram")
+cran.packages <- c("data.table",
+                   "VennDiagram",
+                   "splitstackshape",
+                   "matrixStats")
 
 # Add packages used during development only
 if(project.variables[["development.stage"]] == TRUE) {
@@ -44,9 +57,9 @@ if (project.variables[["development.stage"]] == TRUE) {
   
   # Are the packages in the last snapshot, the same as in the local downloaded packages?
   packages.are.up.to.date <- all(packages.status$packrat.version == packages.status$library.version)
-  
+
   # If not, snapshot the loaded packages
-  if (packages.are.up.to.date == FALSE) {
+  if (packages.are.up.to.date == FALSE | is.na(packages.are.up.to.date) == TRUE ) {
     snapshot()  
   }
   

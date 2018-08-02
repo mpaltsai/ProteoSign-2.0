@@ -4,6 +4,10 @@
 # Clear enviroment
 rm(list = ls())
 
+# Return the memory to the OS
+gc(verbose = FALSE,
+   reset = TRUE) 
+
 # Set project variables
 project.variables <- list("development.stage" = TRUE)
 
@@ -98,8 +102,8 @@ if (dir.exists("packrat") == FALSE &
 # Scripts to call
 files.to.load <- c( "initialize.R",
                     "load_data.R",
-                    "build.R")#,
-                    #"analyze.R")
+                    "build.R",
+                    "analyze.R")
 
 # Set the currenct working directory
 setwd(here("src"))

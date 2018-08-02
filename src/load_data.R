@@ -10,6 +10,10 @@ rm(list = grep(paste(c("^global.variables",
                value = TRUE,
                invert = TRUE))
 
+# Return the memory to the OS
+gc(verbose = FALSE,
+   reset = TRUE)
+
 # Which software do the data come from
 if( global.variables[["dataset.origin"]] == "MaxQuant") {
   cat("Data origin: MaxQuant.\n")
@@ -89,7 +93,7 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
   
   # Store it in a global variable
   global.variables[["protein.groups.data"]] <- protein.groups.data
-  
+
   cat("========== End of load_data.R ==========\n")
 }
 

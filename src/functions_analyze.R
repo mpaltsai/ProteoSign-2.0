@@ -34,12 +34,12 @@ make.limma.folder <- function() {
     })
 }
 
-make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.title) {
+make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.title) {
   #
   # Makes a Venn diagram between 2 conditions
   #
   # Args:
-  #   evidence.data:          The data.table with the evidence data
+  #   analysis.data:          The data.table with the evidence data
   #   conditions.to.compare:  A vector with the 2 conditions to compare
   #   analysis.title:         The analysis title provided by the user
   #
@@ -77,8 +77,9 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.tit
   setwd(limma.output)
   
   # Count the occurences of each protein in each condition
-  venn.table <- venn.table[, .("Occurences"=.N), by=c( "Protein IDs",
-                                            "Condition")]
+  venn.table <- venn.table[, .("Occurences"=.N), 
+                           by=c( "Protein IDs",
+                                  "Condition")]
   
   # Order the data.table
   setkey(venn.table, Condition)
@@ -163,4 +164,54 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
                                             perl = TRUE) == FALSE)
   
   return (data.no.contaminants.no.reverse)
+}
+
+use.peptides.median <- function(analysis.data, condition.names) {
+  #
+  # Find the median of the detected peptides intensities
+  # 
+  # Args:
+  #   analysis.data:    The analysis data.table
+  #   condition.names:  The conditions to compare
+  #
+  #
+  # Returns:
+  #   A list the the medianized intensities of the peptides for each condition
+  #
+  #
+  
+  # Initialize the lsit to return
+  median.intensity.list  <- list()
+  
+  # Make a copy of the analysis data
+  data <- copy(analysis.data)
+  
+  # Iterate over conditions
+  for (condition in condition.names)  {
+    
+    # Calculate the max number of intensities identified for a peptide
+    max.peptides <- splits <- max(lengths(strsplit(data[, get(condition)],
+                                                   ";")))
+    
+    # Utilize the tstrsplit of the data.table for a wide format filled with NA where no intensity is found
+    data[, paste0("Intensity", 1 : max.peptides) := tstrsplit(get(condition),
+                                                              ";",
+                                                              fixed=TRUE,
+                                                              type.convert = TRUE)]
+    
+    # Now to get the median use the rowMedians from matrixStats package for fast and easy calculation!
+    data[, `Median Intensity` := rowMedians(as.matrix(.SD),
+                                            na.rm = TRUE),
+           .SDcols = paste0("Intensity", 1 : max.peptides)]
+    
+    # Get the median column
+    median.intensity <- data[, "Median Intensity"]
+    
+    # Add the median intensities to the list
+    median.intensity.list[[condition]] <- median.intensity
+    
+  }
+  
+  return (median.intensity.list)
+  
 }
