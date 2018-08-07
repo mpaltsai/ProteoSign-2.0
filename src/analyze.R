@@ -20,33 +20,27 @@ gc(verbose = FALSE,
 # 
 # make.Venn.diagram(evidence.data)
 
+### DATA IMPORT STEP ###
+
 # Get the analysis data from the global.variables list
 analysis.data <- global.variables[["analysis.data"]]
 
 # Get the conditions to compare vector from the global.variables list
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
-  
+
+### FILTERING STEP ###
+
 # Filter out contaminants and reverse sequences
-analysis.data <- filter.out.reverse.and.contaminants(analysis.data)
+filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
+
+### NORMALIZATION STEP ###
 
 # Select the median of the peptide intensities
-median.intensities <- use.peptides.median(analysis.data, conditions.to.compare)
+vsn.normalized.data <- do.vsn.normalization(filtered.data, conditions.to.compare)
 
-# Replace the multiple peptide intensities with the median from the 2 conditions
-analysis.data[, eval(conditions.to.compare[1]) := median.intensities[[1]]$`Median Intensity`]
 
-analysis.data[, eval(conditions.to.compare[2]) := median.intensities[[2]]$`Median Intensity`]
 
-# And rename the columns as "Condition X Median Intensity"
-setnames(analysis.data,
-         conditions.to.compare[1],
-         paste(conditions.to.compare[1],
-               "Median Intensity"))
 
-setnames(analysis.data,
-         conditions.to.compare[2],
-         paste(conditions.to.compare[2],
-               "Median Intensity"))
 
 cat("========== End of analyze.R ==========\n")
 

@@ -166,52 +166,101 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
   return (data.no.contaminants.no.reverse)
 }
 
-use.peptides.median <- function(analysis.data, condition.names) {
+use.peptides.median <- function (intensities, minimum.detections = 2) {
+  intensities <- unlist(intensities)
+  intensities <- intensities[!is.na(intensities)]
+  if (length(intensities) < minimum.detections) {
+    return (list(NA))
+  } else {
+    return (list(median(intensities)))  
+  }
+  
+}
+
+do.vsn.normalization <- function(filtered.data, condition.names, minimum.detections = 2) {
   #
-  # Find the median of the detected peptides intensities
+  # Does variance stabilizing normalization (VSN) on the peptides intensities
   # 
   # Args:
-  #   analysis.data:    The analysis data.table
-  #   condition.names:  The conditions to compare
-  #
+  #   filtered.data:      The filtered data data.table
+  #   condition.names:    The conditions to compare
+  #   minimum.detections: Default is 2. A strictness parameter regarding how many times is a peptide measured
+  #                       If it is measures less than N times, the peptide is considered as detected but not measures
+  #                       hence its value is set to NA
   #
   # Returns:
-  #   A list the the medianized intensities of the peptides for each condition
+  #   The normalized analysis data.table
   #
   #
   
-  # Initialize the lsit to return
-  median.intensity.list  <- list()
+  # Initialize the variable to return 
+  vsn.normalized.data <- NULL
   
   # Make a copy of the analysis data
-  data <- copy(analysis.data)
+  data <- copy(filtered.data)
   
+  # Keep only the information regarding the biological replicate for each peptide
+  data[, description:= gsub("^B|T.*$","", description, perl = TRUE)]
+  
+  # Rename the "description" column to "Biological Replicate"
+  setnames(data, "description", "Biological Replicate")
+  
+  # Reorder the data.table
+  setkey(data, `Biological Replicate`,`Protein IDs`,`Unique Sequence ID` )
+  condition.names <- global.variables$conditions.to.compare
   # Iterate over conditions
   for (condition in condition.names)  {
     
-    # Calculate the max number of intensities identified for a peptide
-    max.peptides <- splits <- max(lengths(strsplit(data[, get(condition)],
-                                                   ";")))
+    # condition <- global.variables$conditions.to.compare[1]
+    # Replace the NaN values with NA
+    set(data, which(is.nan(data[, eval(condition)])), condition, NA)
     
-    # Utilize the tstrsplit of the data.table for a wide format filled with NA where no intensity is found
-    data[, paste0("Intensity", 1 : max.peptides) := tstrsplit(get(condition),
-                                                              ";",
-                                                              fixed=TRUE,
-                                                              type.convert = TRUE)]
+    # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
+    # replicates on the x axis
+    wide.data <- dcast(data,
+                   `Protein IDs` + `Unique Sequence ID` ~ `Biological Replicate`,
+                   value.var = condition,
+                   fun.aggregate = use.peptides.median)
     
-    # Now to get the median use the rowMedians from matrixStats package for fast and easy calculation!
-    data[, `Median Intensity` := rowMedians(as.matrix(.SD),
-                                            na.rm = TRUE),
-           .SDcols = paste0("Intensity", 1 : max.peptides)]
+    # Get only the part of the data.table with the intensities of the peptides
+    vsn.matrix <- as.matrix(wide.data[, .SD, .SDcols = -c(1, 2)])
     
-    # Get the median column
-    median.intensity <- data[, "Median Intensity"]
+    # Do the normalization and suppress the warnings regardind the NA removal the the vsn package throws by default
+    suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix))
     
-    # Add the median intensities to the list
-    median.intensity.list[[condition]] <- median.intensity
+    # Replace the old values of the matrix with the new
+    for (index in 1:ncol(vsn.matrix)) {
+      wide.data[, index + 2] <- vsn.matrix.normalized[, index]  
+    }
     
+    # Return the data.table to long format
+    long.data <- melt(wide.data,
+                 id.vars = c( "Protein IDs", "Unique Sequence ID"),
+                 variable.name = "Biological Replicate",
+                 value.name = condition)
+    
+    # Stupid renaming workaround to set the condition name as the next command had trouble to get the name
+    # from the condition variable
+    setnames(long.data, condition, "V1")
+    
+    # Reorder the columns to match the format of the initial data.table
+    setcolorder(long.data,
+             c("Biological Replicate",
+             "Protein IDs",
+             "Unique Sequence ID",
+             "V1"))
+    
+    # End of stupid renaming workaround to set the condition name as the next command had trouble to get 
+    # the name from the condition variable
+    setnames(long.data, "V1", condition)
+    
+    # If the return table is empty just copy the first data.table, otherwise add the second condition column
+    if (is.null(vsn.normalized.data) == TRUE) {
+      vsn.normalized.data <- copy(long.data)
+    } else {
+      vsn.normalized.data[, eval(condition) := long.data[, get(condition)]]
+    }
   }
   
-  return (median.intensity.list)
-  
+  return (vsn.normalized.data)
 }
