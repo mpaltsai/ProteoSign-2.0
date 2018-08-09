@@ -150,6 +150,9 @@ experimental.structure$description <- experimental.description
 # Turn experimental structure into a data.table
 experimental.structure <- data.table(experimental.structure)
 
+# Add the number of biological/ technical replicates and fraction per condition
+global.variables[["experimental.metadata"]] <- get.experiment.metadata(experimental.structure) 
+
 # Update the experimental.structure global variable 
 global.variables[["experimental.structure"]] <- experimental.structure
 

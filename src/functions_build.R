@@ -515,6 +515,50 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
   return (experimental.description)
 }
 
+get.experiment.metadata <- function(experimental.structure) {
+  #
+  # Makes a list of lists where each element corresponds to a conditions, and the number of biological/technical
+  # replicates and fractions for this condition 
+  #
+  # Args:
+  #   experimental.structure: The experimenta structure data.table
+  #
+  # Retutns:
+  #   A list of lists where each element corresponds to a conditions, and the number of biological/technical
+  #   replicates and fractions for this condition 
+  #
+  
+  # Make an empty experimental metadata list
+  experiment.metadata <- list()
+  
+  # Get the conditions 
+  conditions <- unique(experimental.structure$condition)
+  
+  # Now traverse through the condition
+  for (condition in conditions) {
+    
+    # For each condition
+    # Get the biological replicates 
+    unique.biological.replicates <- unique(experimental.structure[condition==condition, `biological replicate`])
+    
+    # Get the technical replicates 
+    unique.technical.replicates <-  unique(experimental.structure[condition==condition, `technical replicate`])
+    
+    # Get the fractions
+    unique.fractions <- unique(experimental.structure[condition==condition, `fraction`])
+    
+    # Now wrap the number of each a list
+    condition.metadata <- list("number.of.biological.replicates" = length(unique.biological.replicates),
+                               "number.of.technical.replicates" = length(unique.technical.replicates),
+                               "number.of.fractions" = length(unique.fractions))
+    
+    # And add that element on the metadata list
+    experiment.metadata[[condition]] <- condition.metadata
+  }
+  
+  return (experiment.metadata)
+}
+
 find.proteome.discoverer.protein.column <- function(evidence.data) {
   #
   # Find the protein groups accession ids column from the Proteome Discoverer evidence file 
@@ -1314,11 +1358,12 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
 
   # Paste and trim the evidence protein ids  with the appropriate protein description column
   # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
-    evidence.data$`Protein IDs` <- trim.evidence.data.protein.descriptions(evidence.data,
+  evidence.data$`Protein IDs` <- trim.evidence.data.protein.descriptions(evidence.data,
                                                                          protein.description.column)
   
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data), data.origin, is.label.free, is.isobaric)
+  
   # Add a column with the user defined condition to compare
   evidence.data <- add.user.condition.column.to.evidence(evidence.data,
                                                     conditions.to.compare,

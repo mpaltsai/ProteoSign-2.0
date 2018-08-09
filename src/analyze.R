@@ -29,15 +29,20 @@ analysis.data <- global.variables[["analysis.data"]]
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
 
 ### FILTERING STEP ###
-
+cat("peos1\n")
 # Filter out contaminants and reverse sequences
 filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
-
+cat("peos2\n")
 ### NORMALIZATION STEP ###
 
 # Select the median of the peptide intensities
 vsn.normalized.data <- do.vsn.normalization(filtered.data, conditions.to.compare)
+cat("peos3\n")
+### IMPUTATION ###
 
+imputed.data <- do.LCMD.imputation(vsn.normalized.data)
+cat("peos4\n")
+### AGGREGATION ### 
 
 
 

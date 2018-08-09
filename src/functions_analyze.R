@@ -167,12 +167,29 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
 }
 
 use.peptides.median <- function (intensities, minimum.detections = 2) {
+  #
+  # Get the median intensity of each peptide
+  #
+  # Args:
+  #   intensities:        The list of the peptide's intensities between the technical replicates and fractions
+  #   minimum.detections: Default is 2. The minimum number of detections to assume that the peptide was detected
+  #
+  # Returns:
+  #   The median intensity of each peptide 
+  #
+  
+  # Unlist the intensities as it is a list of lists
   intensities <- unlist(intensities)
+  
+  # Remove the NAs
   intensities <- intensities[!is.na(intensities)]
+  
+  # If the number oif intensities is less than the threshold we assume that the peptide was not detected
+  # Else  re return the median of the peptides intensity
   if (length(intensities) < minimum.detections) {
     return (list(NA))
   } else {
-    return (list(median(intensities)))  
+    return (list(mean(intensities)))  
   }
   
 }
@@ -207,11 +224,10 @@ do.vsn.normalization <- function(filtered.data, condition.names, minimum.detecti
   
   # Reorder the data.table
   setkey(data, `Biological Replicate`,`Protein IDs`,`Unique Sequence ID` )
-  condition.names <- global.variables$conditions.to.compare
+  
   # Iterate over conditions
   for (condition in condition.names)  {
     
-    # condition <- global.variables$conditions.to.compare[1]
     # Replace the NaN values with NA
     set(data, which(is.nan(data[, eval(condition)])), condition, NA)
     
@@ -233,34 +249,83 @@ do.vsn.normalization <- function(filtered.data, condition.names, minimum.detecti
       wide.data[, index + 2] <- vsn.matrix.normalized[, index]  
     }
     
-    # Return the data.table to long format
-    long.data <- melt(wide.data,
-                 id.vars = c( "Protein IDs", "Unique Sequence ID"),
-                 variable.name = "Biological Replicate",
-                 value.name = condition)
+    # Get the names of the columns
+    no.condition.column.names <- colnames(wide.data)
     
-    # Stupid renaming workaround to set the condition name as the next command had trouble to get the name
-    # from the condition variable
-    setnames(long.data, condition, "V1")
+    # Add the condition prefix
+    condition.prefix.column.names <- paste(condition, no.condition.column.names[-c(1,2)])
     
-    # Reorder the columns to match the format of the initial data.table
-    setcolorder(long.data,
-             c("Biological Replicate",
-             "Protein IDs",
-             "Unique Sequence ID",
-             "V1"))
-    
-    # End of stupid renaming workaround to set the condition name as the next command had trouble to get 
-    # the name from the condition variable
-    setnames(long.data, "V1", condition)
+    # And reset the column names
+    colnames(wide.data) <- c(no.condition.column.names[c(1,2)], condition.prefix.column.names)
     
     # If the return table is empty just copy the first data.table, otherwise add the second condition column
     if (is.null(vsn.normalized.data) == TRUE) {
-      vsn.normalized.data <- copy(long.data)
+      vsn.normalized.data <- copy(wide.data)
     } else {
-      vsn.normalized.data[, eval(condition) := long.data[, get(condition)]]
+      vsn.normalized.data <- merge(vsn.normalized.data,
+                                   wide.data,
+                                   by=c("Protein IDs", "Unique Sequence ID"))
     }
   }
   
   return (vsn.normalized.data)
 }
+
+do.LCMD.imputation <- function(vsn.normalized.data) {
+  #
+  # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
+  #
+  # Args:
+  #   vsn.normalized.data: The normalized data.table
+  #
+  # Returns:
+  #   The imputated data.table
+  #
+  
+  # Copy the initial normalized data
+  imputed.data <- copy(vsn.normalized.data)
+  
+  # Make a matrix with only the intensities
+  data.to.impute <- as.matrix(vsn.normalized.data[, -c(1,2)])
+  
+  # Do the imputation
+  imputed.matrix <- impute.QRILC(data.to.impute)[[1]]
+  
+  # And update the initial data.table
+  for (index in 1:ncol(imputed.matrix)) {
+    imputed.data[, index + 2] <- imputed.matrix[, index]  
+  }
+  
+  return (imputed.data)  
+}
+
+do.peptides.aggregation <- function(imputed.data) {
+  #
+  # Aggregates the peptides' intensities in order to get the protein abundance in each condition/biological replicate
+  #
+  # Args:
+  #   imputed.data; The data.table with the imputed data
+  #
+  # Returns:
+  #   The data.table with the protein abundances for each protein in each condition/biological replicate
+  #
+  
+  # Make a copy of the imputed data
+  aggregated.data <- copy(imputed.data)
+  
+  # Do the aggregation of the peptides' intensity that belong to the same protein
+  aggregated.data <- aggregated.data[, lapply(.SD, sum), .SDcols=!"Unique Sequence ID", by="Protein IDs"]
+  
+  # And rename the columns
+  old.column.names <- colnames(aggregated.data)[-c(1)]
+  
+  # In order to  know that
+  new.column.names <- paste("Protein Abundance", old.column.names)
+  
+  # The columns now hold the protein abundances
+  colnames(aggregated.data)[-c(1)] <- new.column.names
+  
+  return (aggregated.data)
+}
+
+
