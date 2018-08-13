@@ -22,11 +22,13 @@ global.variables <- list("quantitation.type"              = "Proteins",
 
 
 # Project Packages to be installed
-cran.packages <- c("data.table",
+cran.packages <- c("ggplot2",
+                   "data.table",
                    "VennDiagram",
                    "splitstackshape",
                    "vsn",
-                   "imputeLCMD")
+                   "imputeLCMD",
+                   "limma")
 
 # Add packages used during development only
 if(project.variables[["development.stage"]] == TRUE) {

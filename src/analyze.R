@@ -28,24 +28,33 @@ analysis.data <- global.variables[["analysis.data"]]
 # Get the conditions to compare vector from the global.variables list
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
 
+experimental.metadata <- global.variables[["experimental.metadata"]]
+
 ### FILTERING STEP ###
-cat("peos1\n")
+
 # Filter out contaminants and reverse sequences
 filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
-cat("peos2\n")
+
 ### NORMALIZATION STEP ###
 
 # Select the median of the peptide intensities
 vsn.normalized.data <- do.vsn.normalization(filtered.data, conditions.to.compare)
-cat("peos3\n")
+
 ### IMPUTATION ###
 
 imputed.data <- do.LCMD.imputation(vsn.normalized.data)
-cat("peos4\n")
+
 ### AGGREGATION ### 
 
+aggregated.data <- do.peptides.aggregation(imputed.data)
 
+### DIFFERENTIAL EXPRESSION ###
 
+limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata)
+
+### PLOTS ###
+
+do.volcano.plots(limma.results, conditions.to.compare, plots.format = 5)
 
 cat("========== End of analyze.R ==========\n")
 
