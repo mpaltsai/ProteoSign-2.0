@@ -50,7 +50,7 @@ aggregated.data <- do.peptides.aggregation(imputed.data)
 
 ### DIFFERENTIAL EXPRESSION ###
 
-limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata)
+limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata, error.correction.method = "BH" )
 
 ### PLOTS ###
 

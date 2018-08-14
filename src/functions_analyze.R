@@ -328,42 +328,233 @@ do.peptides.aggregation <- function(imputed.data) {
   return (aggregated.data)
 }
 
-do.MA.plot <- function(aggregated.data, conditions.to.compare, experimental.metadata) {
+do.QQ.plots <- function(aggregated.data, conditions.to.compare, plots.format = 5) {
+  #
+  # Produces 2 QQ plots, one with tile and one with no title
+  #
+  # Args:
+  #   limma.results:          The data.frame with the limma results
+  #   conditions.to.compare:  The condition for the descriptive plot
+  #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
+  #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
+  #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
+  # Returns:
+  #   The saved plots inside the data-out/limma-output folder
+  #
   
-  data.MA <- copy(aggregated.data)
+  # Copy the data.table
+  data <- copy(aggregated.data)
   
-  #  Get the condition names
+  # Remove the protein ids column
+  data[, "Protein IDs":= NULL]
+  
+  # Get the conditions' names
   condition.A <- conditions.to.compare[[1]]
   condition.B <- conditions.to.compare[[2]]
   
+  
   # Get the number of biological replicates for each condition
   condition.A.number.of.biological <- experimental.metadata[[condition.A]]$number.of.biological.replicates
-  condition.B.number.of.biological <- experimental.metadata[[condition.B]]$number.of.biological.replicates
   
   # Get the number of technical replicates for each condition
   condition.A.number.of.technical <- experimental.metadata[[condition.A]]$number.of.technical.replicates
-  condition.B.number.of.technical <- experimental.metadata[[condition.B]]$number.of.technical.replicates
   
-  condition.A.total.replicates <- condition.A.number.of.biological * condition.A.number.of.technical
-  condition.B.total.replicates <- condition.B.number.of.biological * condition.B.number.of.technical
+  # Colorblind-friendly palette with grey:
+  colorblind.palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
   
-  condition.A.columns <- seq(2, condition.A.total.replicates + 1)
-  condition.B.columns <- seq(condition.A.total.replicates + 2, condition.A.total.replicates + condition.B.total.replicates +1)
+  condition.A.data <- as.double(as.matrix(data[, 1:(condition.A.number.of.biological * condition.A.number.of.technical)]))
   
+  condition.B.data <- as.double(as.matrix(data[, ((condition.A.number.of.biological * condition.A.number.of.technical) + 1): ncol(data)]))
+    
+  type <- c(rep.int(condition.A, length(condition.A.data)), rep.int(condition.B, length(condition.B.data)))
+  
+  abundancies <- c(condition.A.data, condition.B.data)
+  
+  data.test <- as.data.frame(cbind(abundancies, type))
+  
+  
+  # Make a MA plot tha does not contain any title or description
+  ma.plot.no.title <- ggplot(data       = limma.results,
+                             aes(x      = AveExpr,
+                                 y      = logFC,
+                                 color  = is.diffenetially.expressed)) +
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme(legend.position="none",
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x ="A (Average Protein Abundance)",
+         y = paste0("M (log2 ", condition.A, "/", condition.B,")")) +
+    scale_color_manual(values = colorblind.palette)
+  
+  # Make a MA plot that with a description
+  ma.plot.with.title <- ggplot(data       = limma.results,
+                               aes(x      = AveExpr,
+                                   y      = logFC,
+                                   color  = is.diffenetially.expressed)) +
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme(legend.position="none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    labs(x     = "A (Average Protein Abundance)",
+         y     = paste0("M (log2 ", condition.A, "/", condition.B,")"),
+         title = "MA-plot") +
+    scale_color_manual(values = colorblind.palette)
+  
+  # Change to the limma directory
+  setwd(here("data-output/limma-output"))
+  
+  # Initialize the plot format
+  plot.format <- ""
+  
+  # In user has specified the he preffed different image format, change to the appropriate format
+  switch(plots.format,
+         plot.format <- "eps",
+         plot.format <- "ps",
+         plot.format <- "tex",
+         plot.format <- "pdf",
+         plot.format <- "jpeg",
+         plot.format <- "tiff",
+         plot.format <- "png",
+         plot.format <- "bmp",
+         plot.format <- "svg")
+  
+  # Save the volcano plot with no description in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("plain-ma-plot",".",plot.format),
+         plot = ma.plot.no.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  
+  # Save the descriptive volcano plot in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("descriptive-ma-plot",".",plot.format),
+         plot = ma.plot.with.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  # Change back to the src directory
+  setwd(here("src"))
+  
+  
+}
 
-  data.MA[, mean.condition.A:= rowMeans(.SD), .SDcols = condition.A.columns]
-  data.MA[, mean.condition.B:= rowMeans(.SD), .SDcols = condition.B.columns]
+do.MA.plots <- function(limma.results, conditions.to.compare, plots.format = 5) {
+  #
+  # Produces 2 MA plots, one with tile and one with no title
+  #
+  # Args:
+  #   limma.results:          The data.frame with the limma results
+  #   conditions.to.compare:  The condition for the descriptive plot
+  #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
+  #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
+  #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
+  # Returns:
+  #   The saved plots inside the data-out/limma-output folder
   
-  data.MA[, grep(condition.A, colnames(data.MA)):= NULL]
-  data.MA[, grep(condition.B, colnames(data.MA)):= NULL]
+  # Get the conditions' names
+  condition.A <- conditions.to.compare[[1]]
+  condition.B <- conditions.to.compare[[2]]
   
-  data.MA[, mean:= mean.condition.A - mean.condition.B]
-  data.MA[, average:= (mean.condition.A + mean.condition.B) / 2]
+  # Colorblind-friendly palette with grey:
+  colorblind.palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
   
-  ggplot(data= data.MA,
-         aes(x = average,
-             y = mean))+
-  geom_point()
+  # Make a MA plot tha does not contain any title or description
+  ma.plot.no.title <- ggplot(data       = limma.results,
+                                  aes(x      = AveExpr,
+                                      y      = logFC,
+                                      color  = is.diffenetially.expressed)) +
+                      geom_point(alpha  = 0.4,
+                                 size   = 1.75) +
+                      theme(legend.position="none",
+                            axis.title.x = element_text( family = "Helvetica",
+                                                         size   = 8),
+                            axis.title.y = element_text( family = "Helvetica",
+                                                         size   = 8)) +
+                      labs(x ="A (Average Protein Abundance)",
+                           y = paste0("M (log2 ", condition.A, "/", condition.B,")")) +
+                      scale_color_manual(values = colorblind.palette)
+  
+  # Make a MA plot that with a description
+  ma.plot.with.title <- ggplot(data       = limma.results,
+                             aes(x      = AveExpr,
+                                 y      = logFC,
+                                 color  = is.diffenetially.expressed)) +
+                        geom_point(alpha  = 0.4,
+                                   size   = 1.75) +
+                        theme(legend.position="none",
+                              plot.title      = element_text( hjust   = 0.5,
+                                                              family  = "Helvetica",
+                                                              size    = 12,
+                                                              face    = "bold"),
+                              axis.title.x    = element_text( family  = "Helvetica",
+                                                              size    = 8),
+                              axis.title.y    = element_text( family  = "Helvetica",
+                                                              size    = 8))+
+                        labs(x     = "A (Average Protein Abundance)",
+                             y     = paste0("M (log2 ", condition.A, "/", condition.B,")"),
+                             title = "MA-plot") +
+                        scale_color_manual(values = colorblind.palette)
+  
+  # Change to the limma directory
+  setwd(here("data-output/limma-output"))
+  
+  # Initialize the plot format
+  plot.format <- ""
+  
+  # In user has specified the he preffed different image format, change to the appropriate format
+  switch(plots.format,
+         plot.format <- "eps",
+         plot.format <- "ps",
+         plot.format <- "tex",
+         plot.format <- "pdf",
+         plot.format <- "jpeg",
+         plot.format <- "tiff",
+         plot.format <- "png",
+         plot.format <- "bmp",
+         plot.format <- "svg")
+  
+  # Save the volcano plot with no description in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("plain-ma-plot",".",plot.format),
+         plot = ma.plot.no.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  
+  # Save the descriptive volcano plot in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("descriptive-ma-plot",".",plot.format),
+         plot = ma.plot.with.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  # Change back to the src directory
+  setwd(here("src"))
+  
+  
 }
 
 do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format = 5) {
@@ -386,27 +577,27 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
   # Get the total number of proteins in the experiment
   number.of.total.proteins <- dim(limma.results)[1]
   
-  # Add a column to indicate if a protein is differentially expressed fold-change > 2 and p-value adjustes < 0.05
-  plot.data$is.diffenetially.expressed = as.factor( abs(plot.data$logFC) > 2 &
-                                                    plot.data$adj.P.Val  < 0.05/number.of.total.proteins)
-  
   # Count the differentially expressed proteins
   number.of.differentially.expressed.proteins <- length(which(plot.data$is.diffenetially.expressed == TRUE))
+  
+  # Colorblind-friendly palette with grey:
+  colorblind.palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
   
   # Make a volcano plot tha does not contain any title or description
   volcano.plot.no.title <- ggplot(data       = plot.data,
                                   aes(x      = logFC,
                                       y      = -log10(adj.P.Val),
-                                      colour = is.diffenetially.expressed)) +
+                                      color  = is.diffenetially.expressed)) +
                            geom_point(alpha  = 0.4,
                                       size   = 1.75) +
-                           theme(legend.position="none", 
+                           theme(legend.position="none",
                                 axis.title.x = element_text( family = "Helvetica",
                                                              size   = 8),
                                 axis.title.y = element_text( family = "Helvetica",
-                                                             size   = 8))+
+                                                             size   = 8)) +
                            labs(x ="log2 fold change",
-                                y = "-log10 p-value")
+                                y = "-log10 p-value") +
+                           scale_color_manual(values = colorblind.palette)
   
   # Now make a title for the descriptive volcano plot
   volcano.title <- paste0( "Differentially Expressed Proteins between conditions ",
@@ -431,13 +622,14 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
   volcano.plot.with.title <- ggplot(data     = plot.data,
                                     aes(x      = logFC,
                                         y      = -log10(adj.P.Val),
-                                        colour = is.diffenetially.expressed)) +
+                                        color  = is.diffenetially.expressed)) +
                              geom_point(alpha  = 0.4,
                                         size   = 1.75) +
                              theme( legend.position ="none", 
                                     plot.title      = element_text( hjust   = 0.5,
                                                                     family  = "Helvetica",
-                                                                    size    = 12),
+                                                                    size    = 12,
+                                                                    face    = "bold"),
                                     plot.subtitle   = element_text( hjust   = 0.5,
                                                                     family  = "Helvetica",
                                                                     size    = 10),
@@ -448,7 +640,8 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
                                     labs(x          = "log2 fold change",
                                          y          = "-log10 p-value",
                                          title      = volcano.title,
-                                         subtitle   = volcano.subtitle)
+                                         subtitle   = volcano.subtitle) +
+                                    scale_color_manual(values = colorblind.palette)
   
   # Change directory to the limma-output folder, inside the data-output folder
   setwd(here("data-output/limma-output"))
@@ -494,16 +687,21 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
   
 }
 
-do.limma.analysis <- function(aggregated.data, conditions.to.compare, experimental.metadata) {
+do.limma.analysis <- function(aggregated.data, conditions.to.compare, experimental.metadata,
+                              error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05) {
   #
   # Does the limma analysis and returns a dataframe with the results of limme
   #
   # Args:
-  #   aggregated.data:        The protein abundancis data.table
-  #   conditions.to.compare:  The condition to compare
-  #   experimental.metadata:  The metadata list of the experiment (condition >  number of biological replicates/
-  #                                                                             number of technical replicates/
-  #                                                                             number of fractions)
+  #   aggregated.data:          The protein abundancis data.table
+  #   conditions.to.compare:    The condition to compare
+  #   experimental.metadata:    The metadata list of the experiment (condition >  number of biological replicates/
+  #                                                                               number of technical replicates/
+  #                                                                               number of fractions)
+  #   fold.change.cut.off:      Default is 1.5. The least fold change  in order to consider a protein differentially expressed
+  #   FDR:                      Default is 0.05. The least fold change  in order to consider a protein differentially expressed
+  #   error.correction.method:  Default is "B". Corrects the Type 1 errors using the Bonferroni correction method or
+  #                             the Benjamini-Hochberg method. Values can be "B" or "BH'
   #
   # Returns:
   #   A data.frame with the results of the limma analysis
@@ -555,10 +753,10 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   limma.fit <- lmFit(limma.data, design) 
   
   # And calculates the statistics
-  limma.fit <- eBayes(limma.fit, trend = TRUE, robust = TRUE)
+  limma.fit <- treat(limma.fit, lfc = log2(fold.change.cut.off), trend = TRUE, robust = TRUE)
   
   # Make a data.frame with the statistics for each protein, sorted by p-value, either it is significant or not
-  limma.results <- topTable(limma.fit, coef = 2, sort.by="P", n=Inf, p.value = 1)
+  limma.results <- topTable(limma.fit, coef = 2, sort.by="P", n=Inf)
   
   # And a column with the protein names
   limma.results <- cbind(Protein=rownames(limma.results), limma.results)
@@ -566,11 +764,26 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   # And restore the rownames to numbers
   rownames(limma.results) <- 1:nrow(limma.results)
   
+  # Depending on the the results conservativeness, use the appropriate method
+  switch(error.correction.method,
+         "B" =  {
+                   limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                                limma.results$P.Value  < (0.05/length(protein.ids))
+                },
+         "BH" = {
+                  limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                              limma.results$adj.P.Val  < FDR
+                },
+         {
+           stop("Invalid limma method for error correction.\n")
+         })
+  
+  
   return (limma.results)
  
 }
 
-tmp.evalutate.correctness <- function(aggregated.data, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
+tmp.evalutate.correctness.t.test <- function(aggregated.data, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
   results <- lapply(proteins, function(proteinID) {
     test.data <- aggregated.data[grep(proteinID, aggregated.data[[1]]), ]
     group1 <- unlist(test.data[1,2:7])
@@ -580,6 +793,14 @@ tmp.evalutate.correctness <- function(aggregated.data, proteins=c("PA3479", "PA5
   results <- unlist(results)
   significant.proteins <- proteins[results < 0.05]
   number.of.significant <- length(significant.proteins)
-  cat(toString(number.of.significant),"proteins we significant:", significant.proteins)
-  return (results)
+  cat(toString(number.of.significant),"proteins where significant:", significant.proteins)
+}
+
+tmp.evalutate.correctness.limma <- function(limma.results, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
+  results <- c()
+  for (protein in proteins) {
+    id <- grep(protein, limma.results$Protein)
+    results <- c(results, limma.results$is.diffenetially.expressed[id])
+  }
+  cat(length(proteins[results]), "proteins where significant:",proteins[results],"\n")
 }
