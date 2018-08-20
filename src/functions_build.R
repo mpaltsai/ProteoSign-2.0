@@ -1364,7 +1364,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data), data.origin, is.label.free, is.isobaric)
   
-  # Add a column with the user defined condition to compare
+  # Add a column with the user defined conditions to compare
   evidence.data <- add.user.condition.column.to.evidence(evidence.data,
                                                     conditions.to.compare,
                                                     conditions.to.raw.files.list,
@@ -1373,8 +1373,8 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                     is.label.free,
                                                     is.isobaric)
   
-  # # Clear the data from the rows with unassigned condition
-  # evidence.data <- clear.user.condition.na.rows(evidence.data)
+  # Clear the data from the rows with unassigned condition
+  evidence.data <- clear.user.condition.na.rows(evidence.data)
   
   evidence.data <- merge(evidence.data,
                          global.variables$experimental.structure,

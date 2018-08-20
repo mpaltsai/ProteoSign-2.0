@@ -62,9 +62,9 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
                               .SD,
                               .SDcols =  c("Protein IDs",
                                            "Condition",
-                                          "biological replicate",
-                                          "technical replicate",
-                                          "fraction")]
+                                           "biological replicate",
+                                           "technical replicate",
+                                           "fraction")]
   
   # Order the subseted data.table
   setkey(venn.table,  "Protein IDs",
@@ -88,7 +88,7 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
   # Count the occurences of each protein in each condition
   venn.table <- venn.table[, .("Occurences"=.N), 
                            by=c( "Protein IDs",
-                                  "Condition")]
+                                 "Condition")]
   
   # Order the data.table
   setkey(venn.table, Condition)
@@ -96,7 +96,7 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
   # Write the data in a TSV file
   write.table(venn.table,
               file = paste0(analysis.title, 
-                          "-venn-data.txt"),
+                            "-venn-data.txt"),
               sep="\t",
               row.names = FALSE,
               quote = FALSE)
@@ -128,10 +128,10 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
                                "test.venn.png",
                                imagetype = "png",
                                main = paste0("Venn diagram between the conditions ",
-                                            conditions[1],
-                                            " and ",
-                                            conditions[2],
-                                            "."),
+                                             conditions[1],
+                                             " and ",
+                                             conditions[2],
+                                             "."),
                                category = conditions,
                                scaled = FALSE,
                                alpha = c(0.7, 0.7),
@@ -146,7 +146,8 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
   setwd(here("src"))  
 }
 
-save.intermediate.data.tables <- function(data, file.name, output.folder = "intermediate-data") {
+save.intermediate.data.tables <- function(data, file.name,
+                                          output.folder = "intermediate-data") {
   #
   # Saves the intermediate data.table into csv format
   #
@@ -204,13 +205,14 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
   # Clean them from the Protein IDs starting with REV__ regarding the Reverse sequences
   data.no.contaminants.no.reverse <- subset(data.no.contaminants,
                                             grepl("^REV__",
-                                            `Protein IDs`,
-                                            perl = TRUE) == FALSE)
+                                                  `Protein IDs`,
+                                                  perl = TRUE) == FALSE)
   
   return (data.no.contaminants.no.reverse)
 }
 
-use.peptides.median <- function (intensities, minimum.detections = 2) {
+use.peptides.median <- function (intensities,
+                                 minimum.detections = 2) {
   #
   # Get the median intensity of each peptide
   #
@@ -238,7 +240,8 @@ use.peptides.median <- function (intensities, minimum.detections = 2) {
   
 }
 
-do.vsn.normalization <- function(filtered.data, conditions.to.compare, minimum.detections = 2, do.norm = TRUE) {
+do.vsn.normalization <- function(filtered.data, conditions.to.compare,
+                                 minimum.detections = 2, do.norm = TRUE) {
   #
   # Does variance stabilizing normalization (VSN) on the peptides intensities
   # 
@@ -279,16 +282,16 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare, minimum.d
     # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
     # replicates on the x axis
     wide.data <- dcast(data,
-                   `Protein IDs` + `Unique Sequence ID` ~ `Biological Replicate`,
-                   value.var = condition,
-                   fun.aggregate = use.peptides.median)
+                       `Protein IDs` + `Unique Sequence ID` ~ `Biological Replicate`,
+                       value.var = condition,
+                       fun.aggregate = use.peptides.median)
     
     # Get only the part of the data.table with the intensities of the peptides
     vsn.matrix <- as.matrix(wide.data[, .SD, .SDcols = -c(1, 2)])
     
     # Do the normalization and suppress the warnings regardind the NA removal the the vsn package throws by default
     if (do.norm == TRUE) {
-      suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix))  
+     suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix,verbose = FALSE))
     } else {
       vsn.matrix.normalized <- vsn.matrix
     }
@@ -321,7 +324,8 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare, minimum.d
   return (vsn.normalized.data)
 }
 
-do.peptide.intensities.plots <- function(intensities.before.normalization, intensities.after.normalization, plots.format = 5) {
+do.peptide.intensities.plots <- function(intensities.before.normalization, intensities.after.normalization,
+                                         plots.format = 5) {
   #
   # Makes 4 boxplot, before and after the normalization, with and without titles
   #
@@ -381,73 +385,73 @@ do.peptide.intensities.plots <- function(intensities.before.normalization, inten
   intensities.before.normalization.plot.no.title <-  ggplot(data  = raw.data.melted,
                                                             aes(x = variable,
                                                                 y = value)) +
-                                                      theme(legend.position = "none",
-                                                            plot.title      = element_text( hjust   = 0.5,
-                                                                                            family  = "Helvetica",
-                                                                                            size    = 12,
-                                                                                            face    = "bold"),
-                                                            axis.title.x    = element_text( family  = "Helvetica",
-                                                                                            size    = 8),
-                                                            axis.title.y    = element_text( family  = "Helvetica",
-                                                                                            size    = 8))+
-                                                      geom_boxplot(aes(fill  = as.factor(condition))) + 
-                                                      labs(x = "Replicates",
-                                                           y = "Peptide Intensities") +
-                                                      scale_fill_manual(values = colorblind.palette)
+    theme(legend.position = "none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    geom_boxplot(aes(fill  = as.factor(condition))) + 
+    labs(x = "Replicates",
+         y = "Peptide Intensities") +
+    scale_fill_manual(values = colorblind.palette)
   
   intensities.after.normalization.plot.no.title <-  ggplot( data  = normalized.data.melted,
                                                             aes(x = variable,
                                                                 y = value)) +
-                                                    theme(legend.position = "none",
-                                                          plot.title      = element_text( hjust   = 0.5,
-                                                                                          family  = "Helvetica",
-                                                                                          size    = 12,
-                                                                                          face    = "bold"),
-                                                          axis.title.x    = element_text( family  = "Helvetica",
-                                                                                          size    = 8),
-                                                          axis.title.y    = element_text( family  = "Helvetica",
-                                                                                          size    = 8))+
-                                                    geom_boxplot(aes(fill  = as.factor(condition))) + 
-                                                    labs(x = "Replicates",
-                                                         y = "Peptide Intensities") +
-                                                    scale_fill_manual(values = colorblind.palette)
+    theme(legend.position = "none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    geom_boxplot(aes(fill  = as.factor(condition))) + 
+    labs(x = "Replicates",
+         y = "Peptide Intensities") +
+    scale_fill_manual(values = colorblind.palette)
   
   # Make the plots with titles
   intensities.before.normalization.plot.with.title <-  ggplot(data  = raw.data.melted,
-                                                            aes(x = variable,
-                                                                y = value)) +
-                                                    theme(legend.position = "none",
-                                                          plot.title      = element_text( hjust   = 0.5,
-                                                                                          family  = "Helvetica",
-                                                                                          size    = 12,
-                                                                                          face    = "bold"),
-                                                          axis.title.x    = element_text( family  = "Helvetica",
-                                                                                          size    = 8),
-                                                          axis.title.y    = element_text( family  = "Helvetica",
-                                                                                          size    = 8))+
-                                                    geom_boxplot(aes(fill  = as.factor(condition))) + 
-                                                    labs(x = "Replicates",
-                                                         y = "Peptide Intensities",
-                                                         title = "Peptide Intensities Before Variance Stabilizing Normalization (VSN)") +
-                                                    scale_fill_manual(values = colorblind.palette)
+                                                              aes(x = variable,
+                                                                  y = value)) +
+    theme(legend.position = "none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    geom_boxplot(aes(fill  = as.factor(condition))) + 
+    labs(x = "Replicates",
+         y = "Peptide Intensities",
+         title = "Peptide Intensities Before Variance Stabilizing Normalization (VSN)") +
+    scale_fill_manual(values = colorblind.palette)
   
   intensities.after.normalization.plot.with.title <-  ggplot( data  = normalized.data.melted,
-                                                            aes(x = variable,
-                                                                y = value)) +
-                                                    theme(legend.position = "none",
-                                                          plot.title      = element_text( hjust   = 0.5,
-                                                                                          family  = "Helvetica",
-                                                                                          size    = 12,
-                                                                                          face    = "bold"),
-                                                          axis.title.x    = element_text( family  = "Helvetica",
-                                                                                          size    = 8),
-                                                          axis.title.y    = element_text( family  = "Helvetica",
-                                                                                          size    = 8))+
-                                                    geom_boxplot(aes(fill  = as.factor(condition))) + 
-                                                    labs(x = "Replicates",
-                                                         y = "Peptides' Intensities",
-                                                         title = "Peptide Intensities After Variance Stabilizing Normalization (VSN)") +
-                                                    scale_fill_manual(values = colorblind.palette)
+                                                              aes(x = variable,
+                                                                  y = value)) +
+    theme(legend.position = "none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    geom_boxplot(aes(fill  = as.factor(condition))) + 
+    labs(x = "Replicates",
+         y = "Peptides' Intensities",
+         title = "Peptide Intensities After Variance Stabilizing Normalization (VSN)") +
+    scale_fill_manual(values = colorblind.palette)
   
   # Change to the limma directory
   setwd(here("data-output/plots"))
@@ -569,7 +573,8 @@ do.peptides.aggregation <- function(imputed.data) {
   return (aggregated.data)
 }
 
-do.QQ.plots <- function(aggregated.data, conditions.to.compare, plots.format = 5) {
+do.QQ.plots <- function(aggregated.data, conditions.to.compare,
+                        plots.format = 5) {
   #
   # Produces 2 QQ plots, one with tile and one with no title
   #
@@ -623,23 +628,23 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, plots.format = 5
   
   # Make a QQ plot tha does not contain any title or description
   qq.plot.no.title <- ggplot(data       = qq.plot.data,
-                            aes(sample  = Abundancies,
-                                group   = Condition,
-                                color   = as.factor(Condition))) +
-                      stat_qq(alpha  = 0.4,
-                              size   = 1.75) +
-                      stat_qq_line(alpha  = 0.4,
-                                   size   = 1.75) +
-                      theme(legend.position = "bottom",
-                            axis.title.x = element_text( family = "Helvetica",
-                                                         size   = 8),
-                            axis.title.y = element_text( family = "Helvetica",
-                                                         size   = 8)) +
-                      labs(x = "Theoretical Quantiles",
-                           y = "Sample QUantiles") +
-                      scale_color_manual(values = colorblind.palette,
-                                         name = "Conditions",
-                                         labels = conditions.to.compare)
+                             aes(sample  = Abundancies,
+                                 group   = Condition,
+                                 color   = as.factor(Condition))) +
+    stat_qq(alpha  = 0.4,
+            size   = 1.75) +
+    stat_qq_line(alpha  = 0.4,
+                 size   = 1.75) +
+    theme(legend.position = "bottom",
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x = "Theoretical Quantiles",
+         y = "Sample QUantiles") +
+    scale_color_manual(values = colorblind.palette,
+                       name = "Conditions",
+                       labels = conditions.to.compare)
   
   # Now make a title for the descriptive QQ plot
   qq.plot.title <- paste0( "Q-Q plot of conditions ",
@@ -653,28 +658,28 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, plots.format = 5
   
   # Make a QQ plot tha contains title or description
   qq.plot.with.title <- ggplot(data       = qq.plot.data,
-                             aes(sample  = Abundancies,
-                                 group   = Condition,
-                                 color   = as.factor(Condition))) +
-                      stat_qq(alpha  = 0.4,
-                              size   = 1.75) +
-                      stat_qq_line(alpha  = 0.4,
-                                   size   = 1.75) +
-                      theme(legend.position = "bottom",
-                            plot.title      = element_text( hjust   = 0.5,
-                                                            family  = "Helvetica",
-                                                            size    = 12,
-                                                            face    = "bold"),
-                            axis.title.x = element_text( family = "Helvetica",
-                                                         size   = 8),
-                            axis.title.y = element_text( family = "Helvetica",
-                                                         size   = 8)) +
-                      labs(x = "Theoretical Quantiles",
-                           y = "Sample QUantiles",
-                           title = qq.plot.title) +
-                      scale_color_manual(values = colorblind.palette,
-                                         name = "Conditions",
-                                         labels = conditions.to.compare)
+                               aes(sample  = Abundancies,
+                                   group   = Condition,
+                                   color   = as.factor(Condition))) +
+    stat_qq(alpha  = 0.4,
+            size   = 1.75) +
+    stat_qq_line(alpha  = 0.4,
+                 size   = 1.75) +
+    theme(legend.position = "bottom",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x = "Theoretical Quantiles",
+         y = "Sample QUantiles",
+         title = qq.plot.title) +
+    scale_color_manual(values = colorblind.palette,
+                       name = "Conditions",
+                       labels = conditions.to.compare)
   
   # Change to the limma directory
   setwd(here("data-output/plots"))
@@ -721,7 +726,8 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, plots.format = 5
   
 }
 
-do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare, plots.format = 5) {
+do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
+                                        plots.format = 5) {
   #
   # Does 2 value ordered ratio plots, one with title and one with not.
   #
@@ -753,55 +759,55 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare, pl
                                  aes(x     = 1:length(Protein),
                                      y     = logFC, 
                                      color = is.diffenetially.expressed))+
-                        geom_point(alpha = 0.7,
-                                   size  = 1.5) +
-                        geom_errorbar(aes(ymin=lower, ymax=upper),
-                                      width = 2.5,
-                                      size  = 1) +
-                        theme(legend.position="bottom",
-                              axis.title.x = element_text( family = "Helvetica",
-                                                           size   = 8),
-                              axis.title.y = element_text( family = "Helvetica",
-                                                           size   = 8)) +
-                        labs(x ="Protein IDs",
-                             y = paste0("Average logFC(",
-                                        conditions.to.compare[1],
-                                        "/",
-                                        conditions.to.compare[2],
-                                        ")")) +
-                        scale_color_manual(values = colorblind.palette,
-                                           name   = "Protein is Differentially Expressed")
+    geom_point(alpha = 0.7,
+               size  = 1.5) +
+    geom_errorbar(aes(ymin=lower, ymax=upper),
+                  width = 2.5,
+                  size  = 1) +
+    theme(legend.position="bottom",
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x ="Protein IDs",
+         y = paste0("Average logFC(",
+                    conditions.to.compare[1],
+                    "/",
+                    conditions.to.compare[2],
+                    ")")) +
+    scale_color_manual(values = colorblind.palette,
+                       name   = "Protein is Differentially Expressed")
   
   # Make the plot with the title
   ratio.plot.with.title <- ggplot( data      = ratio.plot.data,
-                                 aes(x     = 1:length(Protein),
-                                     y     = logFC, 
-                                     color = is.diffenetially.expressed))+
-                          geom_point(alpha = 0.7,
-                                     size  = 1.5) +
-                          geom_errorbar(aes(ymin = lower,
-                                            ymax = upper),
-                                        width = 2.5,
-                                        size  = 1) +
-                          theme(legend.position="bottom",
-                                plot.title      = element_text( hjust   = 0.5,
-                                                                family  = "Helvetica",
-                                                                size    = 12,
-                                                                face    = "bold"),
-                                axis.title.x = element_text( family = "Helvetica",
-                                                             size   = 8),
-                                axis.title.y = element_text( family = "Helvetica",
-                                                             size   = 8)) +
-                          labs(x ="Protein IDs",
-                               y = paste0("Average logFC(",
-                                          conditions.to.compare[1],
-                                          "/",
-                                          conditions.to.compare[2],
-                                          ")"),
-                               title = "Value Ordered fold-change plot") +
-                          scale_color_manual(values = colorblind.palette,
-                                             name   = "Protein is Differentially Expressed")
-                            
+                                   aes(x     = 1:length(Protein),
+                                       y     = logFC, 
+                                       color = is.diffenetially.expressed))+
+    geom_point(alpha = 0.7,
+               size  = 1.5) +
+    geom_errorbar(aes(ymin = lower,
+                      ymax = upper),
+                  width = 2.5,
+                  size  = 1) +
+    theme(legend.position="bottom",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x ="Protein IDs",
+         y = paste0("Average logFC(",
+                    conditions.to.compare[1],
+                    "/",
+                    conditions.to.compare[2],
+                    ")"),
+         title = "Value Ordered fold-change plot") +
+    scale_color_manual(values = colorblind.palette,
+                       name   = "Protein is Differentially Expressed")
+  
   # Change to the limma directory
   setwd(here("data-output/plots"))
   
@@ -846,7 +852,8 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare, pl
   
 }
 
-do.MA.plots <- function(limma.results, conditions.to.compare, plots.format = 5) {
+do.MA.plots <- function(limma.results, conditions.to.compare,
+                        plots.format = 5) {
   #
   # Produces 2 MA plots, one with tile and one with no title
   #
@@ -858,6 +865,7 @@ do.MA.plots <- function(limma.results, conditions.to.compare, plots.format = 5) 
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
   # Returns:
   #   The saved plots inside the data-out/plots folder
+  #
   
   # Get the conditions' names
   condition.A <- conditions.to.compare[[1]]
@@ -868,40 +876,40 @@ do.MA.plots <- function(limma.results, conditions.to.compare, plots.format = 5) 
   
   # Make a MA plot tha does not contain any title or description
   ma.plot.no.title <- ggplot(data       = limma.results,
-                                  aes(x      = AveExpr,
-                                      y      = logFC,
-                                      color  = is.diffenetially.expressed)) +
-                      geom_point(alpha  = 0.4,
-                                 size   = 1.75) +
-                      theme(legend.position="none",
-                            axis.title.x = element_text( family = "Helvetica",
-                                                         size   = 8),
-                            axis.title.y = element_text( family = "Helvetica",
-                                                         size   = 8)) +
-                      labs(x ="A (Average Protein Abundance)",
-                           y = paste0("M (log2 ", condition.A, "/", condition.B,")")) +
-                      scale_color_manual(values = colorblind.palette)
-  
-  # Make a MA plot that with a description
-  ma.plot.with.title <- ggplot(data       = limma.results,
                              aes(x      = AveExpr,
                                  y      = logFC,
                                  color  = is.diffenetially.expressed)) +
-                        geom_point(alpha  = 0.4,
-                                   size   = 1.75) +
-                        theme(legend.position="none",
-                              plot.title      = element_text( hjust   = 0.5,
-                                                              family  = "Helvetica",
-                                                              size    = 12,
-                                                              face    = "bold"),
-                              axis.title.x    = element_text( family  = "Helvetica",
-                                                              size    = 8),
-                              axis.title.y    = element_text( family  = "Helvetica",
-                                                              size    = 8))+
-                        labs(x     = "A (Average Protein Abundance)",
-                             y     = paste0("M (log2 ", condition.A, "/", condition.B,")"),
-                             title = "MA-plot") +
-                        scale_color_manual(values = colorblind.palette)
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme(legend.position="none",
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x ="A (Average Protein Abundance)",
+         y = paste0("M (log2 ", condition.A, "/", condition.B,")")) +
+    scale_color_manual(values = colorblind.palette)
+  
+  # Make a MA plot that with a description
+  ma.plot.with.title <- ggplot(data       = limma.results,
+                               aes(x      = AveExpr,
+                                   y      = logFC,
+                                   color  = is.diffenetially.expressed)) +
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme(legend.position="none",
+          plot.title      = element_text( hjust   = 0.5,
+                                          family  = "Helvetica",
+                                          size    = 12,
+                                          face    = "bold"),
+          axis.title.x    = element_text( family  = "Helvetica",
+                                          size    = 8),
+          axis.title.y    = element_text( family  = "Helvetica",
+                                          size    = 8))+
+    labs(x     = "A (Average Protein Abundance)",
+         y     = paste0("M (log2 ", condition.A, "/", condition.B,")"),
+         title = "MA-plot") +
+    scale_color_manual(values = colorblind.palette)
   
   # Change to the limma directory
   setwd(here("data-output/plots"))
@@ -946,7 +954,8 @@ do.MA.plots <- function(limma.results, conditions.to.compare, plots.format = 5) 
   setwd(here("src"))
 }
 
-do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format = 5, fold.change.cut.off = 1.5, FDR = 0.05 ) {
+do.volcano.plots <- function(limma.results, conditions.to.compare,
+                             plots.format = 5, error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05 ) {
   #
   # Generates and saves the 2 volcano plots in the appropriate format, one plain and one with descriptive info
   #
@@ -956,6 +965,8 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
+  #   error.correction.method:  Default is "B". Corrects the Type 1 errors using the Bonferroni correction method or
+  #                             the Benjamini-Hochberg method. Values can be "B" or "BH'
   #   fold.change.cut.off:      Default is 1.5. The least fold change  in order to consider a protein differentially expressed
   #   FDR:                      Default is 0.05. The least fold change  in order to consider a protein differentially expressed
   #
@@ -980,16 +991,16 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
                                   aes(x      = logFC,
                                       y      = -log10(adj.P.Val),
                                       color  = is.diffenetially.expressed)) +
-                           geom_point(alpha  = 0.4,
-                                      size   = 1.75) +
-                           theme(legend.position="none",
-                                axis.title.x = element_text( family = "Helvetica",
-                                                             size   = 8),
-                                axis.title.y = element_text( family = "Helvetica",
-                                                             size   = 8)) +
-                           labs(x ="log2 fold change",
-                                y = "-log10 p-value") +
-                           scale_color_manual(values = colorblind.palette)
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme(legend.position="none",
+          axis.title.x = element_text( family = "Helvetica",
+                                       size   = 8),
+          axis.title.y = element_text( family = "Helvetica",
+                                       size   = 8)) +
+    labs(x ="log2 fold change",
+         y = "-log10 p-value") +
+    scale_color_manual(values = colorblind.palette)
   
   # Now make a title for the descriptive volcano plot
   volcano.title <- paste0( "Differentially Expressed Proteins between conditions ",
@@ -999,6 +1010,12 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
   
   # In case that the description is longer than 70 characters, break the title into multiple lines
   volcano.title <- paste0(strwrap(volcano.title, 70), collapse = "\n")
+  
+  if (error.correction.method == "B") {
+    p.value.correction.method <- "Bonferroni"
+  } else {
+    p.value.correction.method <- "Benjamini–Hochberg"
+  }
   
   # Do the same for the subtitle
   volcano.subtitle <- paste0(number.of.differentially.expressed.proteins,
@@ -1011,6 +1028,8 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
                              fold.change.cut.off,
                              " , FDR = ",
                              FDR,
+                             ", p-value correction method = ",
+                             p.value.correction.method,
                              ")")
   
   # Do the same for the subtitle
@@ -1021,25 +1040,25 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
                                     aes(x      = logFC,
                                         y      = -log10(adj.P.Val),
                                         color  = is.diffenetially.expressed)) +
-                             geom_point(alpha  = 0.4,
-                                        size   = 1.75) +
-                             theme( legend.position ="none", 
-                                    plot.title      = element_text( hjust   = 0.5,
-                                                                    family  = "Helvetica",
-                                                                    size    = 12,
-                                                                    face    = "bold"),
-                                    plot.subtitle   = element_text( hjust   = 0.5,
-                                                                    family  = "Helvetica",
-                                                                    size    = 10),
-                                    axis.title.x    = element_text( family  = "Helvetica",
-                                                                    size    = 8),
-                                    axis.title.y    = element_text( family  = "Helvetica",
-                                                                    size    = 8))+
-                                    labs(x          = "log2 fold change",
-                                         y          = "-log10 p-value",
-                                         title      = volcano.title,
-                                         subtitle   = volcano.subtitle) +
-                                    scale_color_manual(values = colorblind.palette)
+    geom_point(alpha  = 0.4,
+               size   = 1.75) +
+    theme( legend.position ="none", 
+           plot.title      = element_text( hjust   = 0.5,
+                                           family  = "Helvetica",
+                                           size    = 12,
+                                           face    = "bold"),
+           plot.subtitle   = element_text( hjust   = 0.5,
+                                           family  = "Helvetica",
+                                           size    = 10),
+           axis.title.x    = element_text( family  = "Helvetica",
+                                           size    = 8),
+           axis.title.y    = element_text( family  = "Helvetica",
+                                           size    = 8))+
+    labs(x          = "log2 fold change",
+         y          = "-log10 p-value",
+         title      = volcano.title,
+         subtitle   = volcano.subtitle) +
+    scale_color_manual(values = colorblind.palette)
   
   # Change directory to the limma-output folder, inside the data-output folder
   setwd(here("data-output/plots"))
@@ -1068,7 +1087,7 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, plots.format 
          units = "in",
          dpi = "print",
          limitsize = FALSE)
- 
+  
   
   # Save the descriptive volcano plot in high resolution 1920x1080 pixels, in the appropriate format
   ggsave(filename = paste0("descriptive-volcano-plot",".",plot.format),
@@ -1096,11 +1115,11 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   #   experimental.metadata:    The metadata list of the experiment (condition >  number of biological replicates/
   #                                                                               number of technical replicates/
   #                                                                               number of fractions)
-  #   fold.change.cut.off:      Default is 1.5. The least fold change  in order to consider a protein differentially expressed
-  #   FDR:                      Default is 0.05. The least fold change  in order to consider a protein differentially expressed
   #   error.correction.method:  Default is "B". Corrects the Type 1 errors using the Bonferroni correction method or
   #                             the Benjamini-Hochberg method. Values can be "B" or "BH'
-  #
+  #   fold.change.cut.off:      Default is 1.5. The least fold change  in order to consider a protein differentially expressed
+  #   FDR:                      Default is 0.05. The least fold change  in order to consider a protein differentially expressed
+  #   
   # Returns:
   #   A data.frame with the results of the limma analysis
   #
@@ -1141,12 +1160,12 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   # Construct the design matrix
   design <- cbind(Intercept = 1, condition.B = c( rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
                                                   rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical))
-                  )
+  )
   # ,
   #                               technical.replicate = c(rep.int(1:condition.A.number.of.technical, condition.A.number.of.biological),
   #                                                       rep.int(1:condition.B.number.of.technical, condition.B.number.of.biological)))
   # 
-
+  
   # Do the linear modelling
   limma.fit <- lmFit(limma.data, design) 
   
@@ -1165,40 +1184,43 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   # Depending on the the results conservativeness, use the appropriate method
   switch(error.correction.method,
          "B" =  {
-                   limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
-                                                                limma.results$P.Value  < (0.05/length(protein.ids))
-                },
+           limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                        limma.results$P.Value  < (0.05/length(protein.ids))
+           
+           limma.results$adj.P.Val <- limma.results$P.Value /length(protein.ids)
+           
+         },
          "BH" = {
-                  limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
-                                                              limma.results$adj.P.Val  < FDR
-                },
+           limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                        limma.results$adj.P.Val  < FDR
+         },
          {
            stop("Invalid limma method for error correction.\n")
          })
   
   
   return (limma.results)
- 
+  
 }
-
-tmp.evalutate.correctness.t.test <- function(aggregated.data, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
-  results <- lapply(proteins, function(proteinID) {
-    test.data <- aggregated.data[grep(proteinID, aggregated.data[[1]]), ]
-    group1 <- unlist(test.data[1,2:7])
-    group2 <- unlist(test.data[1,8:13])
-    return (t.test(group1, group2)$"p.value")
-  })
-  results <- unlist(results)
-  significant.proteins <- proteins[results < 0.05]
-  number.of.significant <- length(significant.proteins)
-  cat(toString(number.of.significant),"proteins where significant:", significant.proteins)
-}
-
-tmp.evalutate.correctness.limma <- function(limma.results, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
-  results <- c()
-  for (protein in proteins) {
-    id <- grep(protein, limma.results$Protein)
-    results <- c(results, limma.results$is.diffenetially.expressed[id])
-  }
-  cat(length(proteins[results]), "proteins where significant:",proteins[results],"\n")
-}
+# 
+# tmp.evalutate.correctness.t.test <- function(aggregated.data, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
+#   results <- lapply(proteins, function(proteinID) {
+#     test.data <- aggregated.data[grep(proteinID, aggregated.data[[1]]), ]
+#     group1 <- unlist(test.data[1,2:7])
+#     group2 <- unlist(test.data[1,8:13])
+#     return (t.test(group1, group2)$"p.value")
+#   })
+#   results <- unlist(results)
+#   significant.proteins <- proteins[results < 0.05]
+#   number.of.significant <- length(significant.proteins)
+#   cat(toString(number.of.significant),"proteins where significant:", significant.proteins)
+# }
+# 
+# tmp.evalutate.correctness.limma <- function(limma.results, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
+#   results <- c()
+#   for (protein in proteins) {
+#     id <- grep(protein, limma.results$Protein)
+#     results <- c(results, limma.results$is.diffenetially.expressed[id])
+#   }
+#   cat(length(proteins[results]), "proteins where significant:",proteins[results],"\n")
+# }

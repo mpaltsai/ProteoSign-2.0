@@ -72,7 +72,7 @@ do.QQ.plots(aggregated.data, conditions.to.compare)
 
 ### DIFFERENTIAL EXPRESSION ###
 
-limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata, error.correction.method = "BH")
+limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata, error.correction.method = "B")
 
 # Save the data.table to the intermediate-data
 save.intermediate.data.tables(limma.results, deparse(substitute(limma.results)), output.folder = "limma-output")
@@ -80,13 +80,23 @@ save.intermediate.data.tables(limma.results, deparse(substitute(limma.results)),
 ### PLOTS ###
 
 # Do the volcano plots
-do.volcano.plots(limma.results, conditions.to.compare, plots.format = 5)
+do.volcano.plots(limma.results, conditions.to.compare, plots.format = 5, error.correction.method = "B")
 
 # Do the MA plots
 do.MA.plots(limma.results, conditions.to.compare)
 
 # Do value order plots
 do.value.ordered.ratio.plot(limma.results, conditions.to.compare)
+
+
+# Remove the build.R and functions_build.R from the enviroment
+functions.in.analyze.R <- list.functions.in.file("analyze.R")
+functions.in.analyze.R <- functions.in.analyze.R$.GlobalEnv
+
+functions.in.functions_analyze.R <- list.functions.in.file("functions_analyze.R")
+functions.in.functions_analyze.R <- functions.in.functions_analyze.R$.GlobalEnv
+
+rm(list = c(functions.in.analyze.R, functions.in.functions_analyze.R))
 
 cat("========== End of analyze.R ==========\n")
 

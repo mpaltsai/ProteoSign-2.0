@@ -198,6 +198,16 @@ global.variables[["evidence.data"]] <- NULL
 
 global.variables[["protein.groups.data"]] <- NULL
 
+# Remove the build.R and functions_build.R from the enviroment
+functions.in.build.R <- list.functions.in.file("build.R")
+functions.in.build.R <- functions.in.build.R$.GlobalEnv
+
+functions.in.functions_build.R <- list.functions.in.file("functions_build.R")
+functions.in.functions_build.R <- functions.in.functions_build.R$.GlobalEnv
+
+rm(list = c(functions.in.build.R, functions.in.functions_build.R))
+
+
 cat("========== End of build.R ==========\n")
 
 
