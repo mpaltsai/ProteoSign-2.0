@@ -2,8 +2,7 @@
 # files have been created/loaded in the workspace.
 
 # Clear enviroment and only keep functions and global/project variables
-rm(list = grep(paste(c("^global.variables",
-                       "^project.variables",
+rm(list = grep(paste(c("^project.variables",
                        lsf.str()),
                      collapse = "|"),
                ls(),
@@ -13,6 +12,24 @@ rm(list = grep(paste(c("^global.variables",
 # Return the memory to the OS
 gc(verbose = FALSE,
    reset = TRUE)
+
+# Path to the analysis metadata file
+analysis.metadata.file <- paste(here(), "data-input/test-case", "analysis-metadata.csv", sep = "/")
+
+# Read the analysis metadata file
+analysis.metadata <- read.csv(analysis.metadata.file,
+                              stringsAsFactors = FALSE,
+                              check.names = FALSE)
+
+# Make an empty global.variables list to store any global variable
+global.variables <- list()
+
+# Initialize the global variables with the analysis parameters
+global.variables[["replicate.multiplexing.is.used"]] <- analysis.metadata$replicate.multiplexing.is.used
+global.variables[["dataset.origin"]] <- analysis.metadata$dataset.origin
+global.variables[["is.label.free"]]  <- analysis.metadata$is.label.free
+global.variables[["is.isobaric"]]    <- analysis.metadata$is.isobaric
+
 
 # Which software do the data come from
 if( global.variables[["dataset.origin"]] == "MaxQuant") {
@@ -24,13 +41,13 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
 is.label.free <- global.variables[["is.label.free"]]
 
 # Path to the experimental structure file
-experimental.structrure.file <- paste(here(), "data-input", "experimental-structure.csv", sep = "/")
+experimental.structrure.file <- paste(here(), "data-input/test-case", "experimental-structure.csv", sep = "/")
 
 # Path to the experimental structure file
-evidence.file <- paste(here(), "data-input", "evidence.txt", sep = "/")
+evidence.file <- paste(here(), "data-input/test-case", "evidence.txt", sep = "/")
 
 # Path to the proteinGroups  file 
-protein.groups.file <- paste(here(), "data-input", "proteinGroups.txt", sep = "/")
+protein.groups.file <- paste(here(), "data-input/test-case", "proteinGroups.txt", sep = "/")
 
 cat("Reading experimental structure file...\n")
 
@@ -46,7 +63,7 @@ colnames(experimental.structure.table) <- tolower(colnames(experimental.structur
 if (is.label.free == TRUE) {
   
   # Path to the raw.files.to.condition.matrix file for label free experiments 
-  raw.files.condition.matrix <- paste(here(), "data-input", "test-case-maxquant-label-free-cyt.csv", sep = "/")
+  raw.files.condition.matrix <- paste(here(), "data-input/test-case", "raw-files-to-conditions.csv", sep = "/")
   
   # Read the raw.files.to.condition.matrix file
   label.free.raw.files.condition.matrix <- read.csv(raw.files.condition.matrix,

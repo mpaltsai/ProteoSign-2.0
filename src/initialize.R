@@ -13,14 +13,6 @@ rm(list = grep("^project.variables|^check.packages",
 gc(verbose = FALSE,
    reset = TRUE)  
 
-# Make a list with the global variables that I want top use
-global.variables <- list("quantitation.type"              = "Proteins",
-                         "replicate.multiplexing.is.used" = FALSE,
-                         "dataset.origin"                 = "MaxQuant",
-                         "is.label.free"                  = TRUE,
-                         "is.isobaric"                    = FALSE)
-
-
 # Project Packages to be installed
 cran.packages <- c( "ggplot2",
                     "NCmisc",

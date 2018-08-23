@@ -90,9 +90,10 @@ if (dir.exists("packrat") == FALSE &
 } else {
   
   library("packrat")
-  cat("peos")
+  
   # Set packrat mode ON
   packrat_mode(on = TRUE)
+  
   if (all(cran.packages %in% .packages()) == FALSE) {
     # Install the Project CRAN Packages needed for development
     check.packages(cran.packages)
