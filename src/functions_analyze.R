@@ -726,6 +726,96 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare,
   
 }
 
+do.fold.change.histogram <- function(limma.results, 
+                                     plots.format = 5) {
+  #
+  # Produces 2 log fold change histograms, one with tile and one with no title
+  #
+  # Args:
+  #   limma.results:          The data.frame with the limma results
+  #   conditions.to.compare:  The condition for the descriptive plot
+  #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
+  #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
+  #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
+  # Returns:
+  #   The saved plots inside the data-out/plots folder
+  #
+  
+  # The histogram without title
+  fold.change.histogram.no.title <-  ggplot(data = limma.results,
+                                            aes(x = logFC)) +
+                                     geom_histogram(color = "#999999",
+                                                    fill  = "#E69F00",
+                                                    bins  = 40) +
+                                     labs(x = "Log Fold-Change",
+                                          y = "Frequency")
+  
+  # The histogram with title
+  fold.change.histogram.with.title <-   ggplot( data  = limma.results,
+                                                aes(x = logFC)) +
+                                        geom_histogram(color = "#999999",
+                                                       fill  = "#E69F00",
+                                                       bins  = 40) +
+                                        theme(plot.title = element_text(hjust   = 0.5,
+                                                                        family  = "Helvetica",
+                                                                        size    = 12,
+                                                                        face    = "bold"),
+                                            axis.title.x = element_text( family = "Helvetica",
+                                                                         size   = 8),
+                                            axis.title.y = element_text( family = "Helvetica",
+                                                                         size   = 8)) +
+                                         labs(x = "Log2 Fold-Change",
+                                              y = "Frequency",
+                                              title = paste0("Log2 Fold-Change ",
+                                                             conditions.to.compare[[1]],
+                                                             "/",
+                                                             conditions.to.compare[[2]],
+                                                             " histogram"))
+  
+  # Change to the limma directory
+  setwd(here("data-output/plots"))
+  
+  # Initialize the plot format
+  plot.format <- ""
+  
+  # In user has specified the he preffed different image format, change to the appropriate format
+  switch(plots.format,
+         plot.format <- "eps",
+         plot.format <- "ps",
+         plot.format <- "tex",
+         plot.format <- "pdf",
+         plot.format <- "jpeg",
+         plot.format <- "tiff",
+         plot.format <- "png",
+         plot.format <- "bmp",
+         plot.format <- "svg")
+  
+  # Save the volcano plot with no description in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("plain-fold-change-histogram",".",plot.format),
+         plot = fold.change.histogram.no.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  
+  # Save the descriptive volcano plot in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("descriptive-fold-change-histogram",".",plot.format),
+         plot = fold.change.histogram.with.title,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
+  
+  # Change back to the src directory
+  setwd(here("src"))
+  
+}
+
 do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
                                         plots.format = 5) {
   #
@@ -1159,15 +1249,35 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   
   # Construct the design matrix
   design <- cbind(Intercept = 1, condition.B = c( rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
-                                                  rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical))
-  )
-  # ,
-  #                               technical.replicate = c(rep.int(1:condition.A.number.of.technical, condition.A.number.of.biological),
-  #                                                       rep.int(1:condition.B.number.of.technical, condition.B.number.of.biological)))
-  # 
+                                                  rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical)))
   
-  # Do the linear modelling
-  limma.fit <- lmFit(limma.data, design) 
+  # In we also have technical replicates, add the appropriate column to the design
+  if (condition.A.number.of.technical != 1 &  condition.B.number.of.technical != 1) {
+    design <- cbind(design, technical.replicate = c(rep.int(1:condition.A.number.of.technical, condition.A.number.of.biological),
+                                                  rep.int(1:condition.B.number.of.technical, condition.B.number.of.biological)))
+    
+    # Prepare the limma block matrix
+    limma.block <- rep(1:(condition.A.number.of.biological + condition.B.number.of.biological), 
+                       c(rep.int(condition.A.number.of.technical, condition.A.number.of.biological),
+                         rep.int(condition.B.number.of.technical, condition.B.number.of.biological)))
+    
+    # Calculate the correlation between the technical replicates
+    duplicate.correlation <- duplicateCorrelation(limma.data, design, block = limma.block)
+    
+    # Get the correlation
+    duplicate.correlation.consensus <- duplicate.correlation$consensus.correlation
+    
+    # Do the linear modelling taking into account the technical replicates and their correlation
+    limma.fit <- lmFit(limma.data, design, block = limma.block, correlation = duplicate.correlation.consensus)
+  } else {
+    
+    # Do the linear modelling in the case we do not have technical replicates
+    limma.fit <- lmFit(limma.data, design)
+  }
+  
+  # contrasts <- makeContrasts(Intercept-condition.B, levels=design)
+  
+  # limma.fit <- contrasts.fit(limma.fit, contrasts)
   
   # And calculates the statistics
   limma.fit <- treat(limma.fit, lfc = log2(fold.change.cut.off), trend = TRUE, robust = TRUE)

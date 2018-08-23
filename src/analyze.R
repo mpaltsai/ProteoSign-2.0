@@ -82,6 +82,9 @@ save.intermediate.data.tables(limma.results, deparse(substitute(limma.results)),
 # Do the volcano plots
 do.volcano.plots(limma.results, conditions.to.compare, plots.format = 5, error.correction.method = "B")
 
+# Do the fold change histograms
+do.fold.change.histogram(limma.results)
+
 # Do the MA plots
 do.MA.plots(limma.results, conditions.to.compare)
 
