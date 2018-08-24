@@ -29,7 +29,11 @@ global.variables[["replicate.multiplexing.is.used"]] <- analysis.metadata$replic
 global.variables[["dataset.origin"]] <- analysis.metadata$dataset.origin
 global.variables[["is.label.free"]]  <- analysis.metadata$is.label.free
 global.variables[["is.isobaric"]]    <- analysis.metadata$is.isobaric
-
+global.variables[["timestamp.to.keep"]] <- analysis.metadata$timestamp.to.keep
+global.variables[["culture.to.keep"]] <- analysis.metadata$culture.to.keep
+global.variables[["raw.files.to.remove"]] <- analysis.metadata$raw.files.to.remove
+global.variables[["raw.files.to.rename"]] <- analysis.metadata$raw.files.to.rename
+global.variables[["conditions.to.compare"]] <- unlist(strsplit(analysis.metadata$conditions.to.compare, split = ","))
 
 # Which software do the data come from
 if( global.variables[["dataset.origin"]] == "MaxQuant") {
@@ -73,7 +77,6 @@ if (is.label.free == TRUE) {
   cat("Label-free experiment: raw.files.to.condition.matrix file loaded!\n")
   
   # Add the file to the global data
-  
   global.variables[["raw.files.condition"]] <- label.free.raw.files.condition.matrix
 }
 
@@ -91,6 +94,27 @@ cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", evidence.file)
 evidence.data <- fread(cleaning.command, integer64 = "numeric")
 
 cat("Evidence file loaded!\n")
+
+# Get the timestamp and the culture to analyze
+timestamp.to.keep <- global.variables[["timestamp.to.keep"]]
+culture.to.keep <- global.variables[["culture.to.keep"]]
+
+# Clean evidence file on specific timestamp or culture
+evidence.data <- keep.only.specific.timestamps.or.cultures(evidence.data,
+                                                           timestamp.to.keep,
+                                                           culture.to.keep)
+
+# If there ar raw file to be renamed, rename them
+if (is.na(global.variables[["raw.files.to.remove"]]) == FALSE & 
+    is.na(global.variables[["raw.files.to.rename"]]) == FALSE) {
+  
+  raw.files.to.remove <- unlist(strsplit(global.variables[["raw.files.to.remove"]], split = ","))
+  raw.files.to.rename <- unlist(strsplit(global.variables[["raw.files.to.rename"]], split = ","))
+  
+  evidence.data <- remove.and.rename.raw.files(evidence.data, raw.files.to.remove, raw.files.to.rename)
+  
+}
+
 
 # Add the evidence data to the global variables list
 global.variables[["evidence.data"]] <- evidence.data
@@ -111,7 +135,8 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
   # Store it in a global variable
   global.variables[["protein.groups.data"]] <- protein.groups.data
 
-  cat("========== End of load_data.R ==========\n")
 }
+
+cat("========== End of load_data.R ==========\n")
 
 

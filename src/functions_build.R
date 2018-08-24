@@ -131,7 +131,7 @@ build.condition.to.raw.files.from.matrix <- function(raw.files.to.coditions.matr
   #   belong to each condition
   #
 
-    # Initialize the new conditions.to.raw.files.list
+  # Initialize the new conditions.to.raw.files.list
   conditions.to.raw.files.list <- list()
 
   # Get all the conditions
@@ -364,7 +364,7 @@ fix.replicates <- function(biological.replicates, technical.replicates) {
   return (fixed.replicates)
 }
 
-fix.replicates.per.condition <- function (replicates.per.condition, replicates.status.per.condition) {
+fix.replicates.per.condition <- function (replicates.per.condition, replicates.status.per.condition, is.label.free = TRUE) {
   #
   # Fixes the bad replicates of replicates.per.condition
   #
@@ -377,6 +377,8 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
   #   corresponds to a conditions and it contains 2 booleans regarding 
   #   the correctness of the biological/technical replicates for this
   #   conditions.
+  #
+  #   is.label.free:  Default is TRUE. The experiment is label-free
   #
   # Returns:
   #   replicates.per.condition: The corrected replicates.per.condition
@@ -392,13 +394,22 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
     
     # Make a code using the biological/technical replicates status
     # for faster comparison than if/else
-    case <- (biological.status * 2  + technical.status * 1) + 1
+    case <- (biological.status * 2  + technical.status * 1) + 1 
+    
+    # If the experiment is labeled change the print message for the cases
+    if (is.label.free == FALSE) {
+      case <- case + 4
+    }
     
     switch(case,
-           cat("Condition", condition, "has bad biological and technical replicates.\n") ,
-           cat("Condition", condition, "has bad biological replicates.\n") ,
-           cat("Condition", condition, "has bad technical replicates.\n") ,
-           cat("Condition", condition, "has good replicates.\n"))
+         cat("Condition", condition, "for the label-free experiment has bad biological and technical replicates.\n") ,
+         cat("Condition", condition, "for the label-free experiment has bad biological replicates.\n") ,
+         cat("Condition", condition, "for the label-free experiment has bad technical replicates.\n") ,
+         cat("Condition", condition, "for the label-free experiment has good replicates.\n"),
+         cat("Experimental setup for the labeled experiment has bad biological and technical replicates.\n") ,
+         cat("Experimental setup for the labeled experiment has bad biological replicates.\n") ,
+         cat("Experimental setup for the labeled experiment has bad technical replicates.\n") ,
+         cat("Experimental setup for the labeled experiment has good biological and technical replicates.\n"))
     
     # If replicates are not good
     if (case != 4) {
@@ -757,7 +768,7 @@ get.evidence.metadata <- function(evidence.columns, data.origin, is.label.free, 
   # TODO check real data!
   
   # Depending on the MaxQuant version there are might be slight 
-  #  differences in the column names
+  # differences in the column names
   if (status.code == 2 | status.code == 4) {
     if ("Raw File" %in% evidence.columns == TRUE) {
       maxquant.raw.file.column <- "Raw File"
@@ -1387,3 +1398,4 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                 is.isobaric)
   return (evidence.data) 
 }
+

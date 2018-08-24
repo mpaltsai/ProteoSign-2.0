@@ -12,7 +12,8 @@ gc(verbose = FALSE,
    reset = TRUE)
 
 # Functions scripts to load
-functions.subfiles <- c("functions_build.R",
+functions.subfiles <- c("functions_load_data.R",
+                        "functions_build.R",
                         "functions_analyze.R")
 
 

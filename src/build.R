@@ -1,9 +1,6 @@
 # Data wrangling with dplyr/tidyr/etc. All the magic happens here. Newly created
 # files in workspace should be displayed. A build boolean variable can be used for
 # data reload from RDS for faster data reload.
-# Data wrangling with dplyr/tidyr/etc. All the magic happens here. Newly created
-# files in workspace should be displayed. A build boolean variable can be used for
-# data reload from RDS for faster data reload.
 
 # Clear enviroment and only keep functions and global/project variables
 rm(list = grep(paste(c("^global.variables",
@@ -24,33 +21,48 @@ experimental.structure <- global.variables[["experimental.structure"]]
 # Order the experimental structure by raw.file name
 experimental.structure <- experimental.structure[order(experimental.structure$"raw file"),]
 
-# Initialize conditions.to.raw.files list
-conditions.to.raw.files.list <- list()
+# Get the global variables needed
+conditions.to.compare <- global.variables[["conditions.to.compare"]]
+is.label.free <- global.variables[["is.label.free"]]
 
-# Get the raw.files.condition.matrix
-raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
+# Be sure that we have 2 conditions to compare
+if (length(conditions.to.compare) != 2) {
+  stop("Invalid conditions.to.compare arguments. Conditions has to be exactly 2.\n")
+}
 
-# Order the raw.files.condition.matrix structure by raw.file name
-raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$"raw file"),]
 
-
-# Build the conditions.to.raw.files list from the experimental structure matrix
-conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
-                                                                            is.label.free = TRUE)
-
-# The conditions that we want to focus on
-conditions.to.compare <- names(conditions.to.raw.files.list)
-
-# COMBAK Add them in the global.variables list [should choose 2!]
-global.variables[["conditions.to.compare"]] <- conditions.to.compare
-
-# Add conditions.to.raw.files.list to the global variables list
-global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.list
+if (is.label.free == TRUE) {
+  # Initialize conditions.to.raw.files list
+  conditions.to.raw.files.list <- list()
+  
+  # Get the raw.files.condition.matrix in case of label-free experiments
+  raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
+  
+  # Order the raw.files.condition.matrix structure by raw.file name
+  raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$"raw file"),]
+  
+  # Build the conditions.to.raw.files list from the experimental structure matrix
+  conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
+                                                                              is.label.free = TRUE)
+  
+  # # The conditions that we want to focus on
+  # conditions.to.compare <- names(conditions.to.raw.files.list[conditions.to.compare])
+  
+  # Add conditions.to.raw.files.list to the global variables list
+  global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.list
+  
+} 
 
 # Read parameters from the global variables list
 replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
 
-experimental.structure$condition <- raw.files.condition.matrix$condition 
+# If we are on a label-free experiment, add the conditions, otherwise just add a generic description
+if (is.label.free == TRUE) {
+  experimental.structure$condition <- raw.files.condition.matrix$condition 
+} else {
+  experimental.structure$condition <- "Labeled Experiment"
+}
+
 # Reorder the experimental structure based on conditions/biological replicates
 # /technical replicates/ fractions
 experimental.structure <- experimental.structure[
@@ -69,7 +81,7 @@ fraction.list <- experimental.structure$fraction
 experimental.conditions.list <- experimental.structure$condition
 
 # Do I have more than 1 replicate 
-# but without replicate multiplexing?
+# but without replicate multiplexing? COMBAK 
 biological.replicates.number.status <- check.replicates.number(replicates.multiplexing,
                                                                 biological.replicates.list)
 
@@ -90,7 +102,8 @@ replicates.status.per.condition <- replicates.status.per.condition(replicates.pe
 
 # Find the problematic replicates and fix them
 fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
-                                                               replicates.status.per.condition)
+                                                               replicates.status.per.condition,
+                                                               is.label.free)
 
 # Reset the with the corrected replicates
 replicates.per.condition <- fixed.replicates.per.condition
