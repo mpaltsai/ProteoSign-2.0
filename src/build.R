@@ -13,17 +13,20 @@ rm(list = grep(paste(c("^global.variables",
 
 # Return the memory to the OS
 gc(verbose = FALSE,
-   reset = TRUE) 
+   reset = TRUE)
+
+### Load all the needed global variables ###
 
 # Read the experimental structure from the global variables list
 experimental.structure <- global.variables[["experimental.structure"]]
 
-# Order the experimental structure by raw.file name
-experimental.structure <- experimental.structure[order(experimental.structure$"raw file"),]
-
-# Get the global variables needed
+# Read the analysis arguments
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
 is.label.free <- global.variables[["is.label.free"]]
+replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
+
+# Order the experimental structure by raw.file name
+experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
 
 # Be sure that we have 2 conditions to compare
 if (length(conditions.to.compare) != 2) {
@@ -39,7 +42,7 @@ if (is.label.free == TRUE) {
   raw.files.condition.matrix <- global.variables[["raw.files.condition"]]
   
   # Order the raw.files.condition.matrix structure by raw.file name
-  raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$"raw file"),]
+  raw.files.condition.matrix <- raw.files.condition.matrix[order(raw.files.condition.matrix$raw.file),]
   
   # Build the conditions.to.raw.files list from the experimental structure matrix
   conditions.to.raw.files.list <- build.condition.to.raw.files.from.matrix(   raw.files.condition.matrix,
@@ -53,9 +56,6 @@ if (is.label.free == TRUE) {
   
 } 
 
-# Read parameters from the global variables list
-replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
-
 # If we are on a label-free experiment, add the conditions, otherwise just add a generic description
 if (is.label.free == TRUE) {
   experimental.structure$condition <- raw.files.condition.matrix$condition 
@@ -67,16 +67,16 @@ if (is.label.free == TRUE) {
 # /technical replicates/ fractions
 experimental.structure <- experimental.structure[
   order(experimental.structure$condition,
-        experimental.structure$"biological replicate",
-        experimental.structure$"technical replicate",
+        experimental.structure$biological.replicate,
+        experimental.structure$technical.replicate,
         experimental.structure$fraction), ]
 
 # Correct the rownames
-rownames(experimental.structure) <- c(1:length(experimental.structure$"raw file"))
+rownames(experimental.structure) <- c(1:length(experimental.structure$raw.file))
 
 # Store each column on a separate variable
-biological.replicates.list <- experimental.structure$"biological replicate"
-technical.replicates.list <- experimental.structure$"technical replicate"
+biological.replicates.list <- experimental.structure$biological.replicate
+technical.replicates.list <- experimental.structure$technical.replicate
 fraction.list <- experimental.structure$fraction
 experimental.conditions.list <- experimental.structure$condition
 
@@ -128,10 +128,10 @@ biological.replicates.list <- restored.replicates$biological.replicates
 technical.replicates.list <- restored.replicates$technical.replicates
 
 # Restore the biological column on the experimenta structure file
-experimental.structure$"biological replicate" <- biological.replicates.list
+experimental.structure$biological.replicate <- biological.replicates.list
 
 # Restore the technical column on the experimenta structure file
-experimental.structure$"technical replicate" <- technical.replicates.list
+experimental.structure$technical.replicate <- technical.replicates.list
 
 # Now exploit the check.number.of.replicates to find if there are
 # replicates of each type in our experiment and construct the setup id
@@ -163,27 +163,31 @@ experimental.structure$description <- experimental.description
 # Turn experimental structure into a data.table
 experimental.structure <- data.table(experimental.structure)
 
-# Add the number of biological/ technical replicates and fraction per condition
-global.variables[["experimental.metadata"]] <- get.experiment.metadata(experimental.structure) 
+# Add the number of biological/ technical replicates
+# and fraction per condition as metadata in a variable
+experimental.metadata <- get.experiment.metadata(experimental.structure) 
+
+# And put them as well in a global variable
+global.variables[["experimental.metadata"]] <- experimental.metadata
 
 # Update the experimental.structure global variable 
 global.variables[["experimental.structure"]] <- experimental.structure
 
 # Store max biological replicates for duplicates handling from limma
 global.variables[["max.biological.replicates"]] <- experimental.structure[,
-                                                                          which.max(`biological replicate`)]
+                                                                          which.max(biological.replicate)]
 
 # Store the minimum number of technical replicates
 global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
-                                                           .SD[which.max(`technical replicate`)],
-                                                           by = `biological replicate`]$"technical replicate")
+                                                           .SD[which.max(technical.replicate)],
+                                                           by = biological.replicate]$technical.replicate)
 
 # Now build the analysis data 
 analysis.data <- build.analysis.data(protein.groups.data = global.variables$protein.groups.data,
                                      evidence.data       = global.variables$evidence.data,
                                      data.origin         = global.variables$dataset.origin,
                                      is.label.free       = global.variables$is.label.free,
-                                     is.isobaric         = FALSE)
+                                     is.isobaric         = global.variables$is.isobaric)
 
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data

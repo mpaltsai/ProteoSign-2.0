@@ -35,8 +35,11 @@ global.variables[["raw.files.to.remove"]] <- analysis.metadata$raw.files.to.remo
 global.variables[["raw.files.to.rename"]] <- analysis.metadata$raw.files.to.rename
 global.variables[["conditions.to.compare"]] <- unlist(strsplit(analysis.metadata$conditions.to.compare, split = ","))
 
+# Get the dataset origin
+dataset.origin <- global.variables[["dataset.origin"]]
+
 # Which software do the data come from
-if( global.variables[["dataset.origin"]] == "MaxQuant") {
+if (dataset.origin == "MaxQuant") {
   cat("Data origin: MaxQuant.\n")
 } else {
   cat("Data origin: Proteome Discoverer.\n")
@@ -50,9 +53,6 @@ experimental.structrure.file <- paste(here(), "data-input/test-case", "experimen
 # Path to the experimental structure file
 evidence.file <- paste(here(), "data-input/test-case", "evidence.txt", sep = "/")
 
-# Path to the proteinGroups  file 
-protein.groups.file <- paste(here(), "data-input/test-case", "proteinGroups.txt", sep = "/")
-
 cat("Reading experimental structure file...\n")
 
 # Read the experimental structure file
@@ -60,7 +60,7 @@ experimental.structure.table <- read.csv(experimental.structrure.file,
                                          stringsAsFactors = FALSE,
                                          check.names = FALSE)
 
-# Lowercase all the columns
+# Lowercase all the columns of the experimental structure file
 colnames(experimental.structure.table) <- tolower(colnames(experimental.structure.table))
 
 # Load the raw-file-to-condition matrix for label free experiments 
@@ -90,8 +90,28 @@ cat("Reading evidence file: ", evidence.file,"...\n", sep = "")
 # Fast cleaning of the evidence file using the tr unix command
 cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", evidence.file)
 
-# Read the evidence data
-evidence.data <- fread(cleaning.command, integer64 = "numeric")
+# Read the evidence data but only for the needed columns
+evidence.data <- fread(cleaning.command,
+                       integer64 = "numeric")
+
+# Get the evidence data column names
+evidence.column.names <- colnames(evidence.data)
+
+# Trim and lowercase the column names for universal handling across
+# MaxQuant/Proteome Discoverer versions 
+trimmed.and.lowercased.column.names <- trim.and.lowercase.column.names(evidence.column.names)
+
+# Set the trimmed and lowercase the evidence columns
+colnames(evidence.data) <- trimmed.and.lowercased.column.names
+
+# The needed columns for the analysis depending on the software
+if (dataset.origin == "MaxQuant") {
+  evindence.columns.to.keep <- c("proteins",
+                                 "raw.file")  
+} else {
+  # Case proteome discoverer
+  evindence.columns.to.keep <- c()
+}
 
 cat("Evidence file loaded!\n")
 
@@ -115,12 +135,14 @@ if (is.na(global.variables[["raw.files.to.remove"]]) == FALSE &
   
 }
 
-
 # Add the evidence data to the global variables list
 global.variables[["evidence.data"]] <- evidence.data
 
 # If data come from MaxQuant Software, find the proteinGroups file and read it
-if( global.variables[["dataset.origin"]] == "MaxQuant") {
+if (dataset.origin == "MaxQuant") {
+  
+  # Path to the proteinGroups  file 
+  protein.groups.file <- paste(here(), "data-input/test-case", "proteinGroups.txt", sep = "/")
   
   cat("Reading proteinGroups file: ", protein.groups.file,"...\n", sep = "")
   
@@ -128,7 +150,36 @@ if( global.variables[["dataset.origin"]] == "MaxQuant") {
   cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", protein.groups.file)
   
   # Read the proteinGroups data
-  protein.groups.data <- fread(cleaning.command, integer64 = "numeric")
+  protein.groups.data <- fread(cleaning.command,
+                               integer64 = "numeric")
+  
+  # Get the protein.groups.data column names
+  protein.column.names <- colnames(protein.groups.data)
+  
+  # Trim and lowercase the column names for universal handling across
+  # MaxQuant/Proteome Discoverer versions 
+  trimmed.and.lowercased.column.names <- trim.and.lowercase.column.names(protein.column.names)
+  
+  # Set the trimmed and lowercase the evidence columns
+  colnames(protein.groups.data) <- trimmed.and.lowercased.column.names
+  
+  # Ideally the protein groups file should contain these files
+  protein.groups.columns.to.keep <- c("protein.ids",
+                                      "fasta.headers",
+                                      "protein.names",
+                                      "only.identified.by.site",
+                                      "reverse",
+                                      "contaminant",
+                                      "id",
+                                      "peptide.ids")
+  
+  # In any case, we take the intersection
+  protein.groups.columns.subset <- intersect(colnames(protein.groups.data),
+                                             protein.groups.columns.to.keep)
+  
+  # Now subset the columns to keep only the needed, in order to make
+  # the data.table as light-weight as possible
+  protein.groups.data <- protein.groups.data[, .SD, .SDcols = protein.groups.columns.subset]
   
   cat("ProteinGroups file loaded!\n")
   

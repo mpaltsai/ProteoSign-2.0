@@ -12,8 +12,6 @@ assign.condition.to.raw.files <- function(condition, raw.files, conditions.to.ra
   #   The updated condition.to.raw.files list or in case of error terminates the analysis
   #
   
-  #TODO labeled experiments
-  
   # The new element to add
   condition.to.raw.files <- list()
   
@@ -138,7 +136,7 @@ build.condition.to.raw.files.from.matrix <- function(raw.files.to.coditions.matr
   conditions <- raw.files.to.coditions.matrix$condition
 
   # Get all the raw.files
-  raw.files <-  raw.files.to.coditions.matrix$`raw file`
+  raw.files <-  raw.files.to.coditions.matrix$raw.file
 
   # Get the unique conditions
   unique.conditions <- unique(conditions)
@@ -302,6 +300,7 @@ replicates.status.per.condition <- function(replicates.per.condition) {
   }
   # Finally add the condition name
   names(replicates.status.per.condition) <- names(replicates.per.condition)
+  
   return (replicates.status.per.condition)
 }
 
@@ -411,10 +410,15 @@ fix.replicates.per.condition <- function (replicates.per.condition, replicates.s
          cat("Experimental setup for the labeled experiment has bad technical replicates.\n") ,
          cat("Experimental setup for the labeled experiment has good biological and technical replicates.\n"))
     
-    # If replicates are not good
-    if (case != 4) {
-      cat("Fixing condition ", condition," ...\n")
+    # If the replicates are not good for both experimental setups
+    if (case != 4 & case != 8) {
       
+      # Print the appropriate message depending on the experiment type
+      if (is.label.free == TRUE) {
+        cat("Fixing condition", condition,"...\n")  
+      } else {
+        cat("Fixing", condition,"...\n")
+      }  
       # Get the biological/technical replicates vector for a particural
       # to be fixed
       biological.replicates <- replicates.per.condition[[index]]$biological.replicates
@@ -461,6 +465,7 @@ restore.replicates <- function(replicates.per.condition) {
   }
   # Finally wrap them in a list
   restored.replicates <- list("biological.replicates" = biological.replicates, "technical.replicates" = technical.replicates)
+  
   return (restored.replicates)
 }
 
@@ -550,13 +555,13 @@ get.experiment.metadata <- function(experimental.structure) {
     
     # For each condition
     # Get the biological replicates 
-    unique.biological.replicates <- unique(experimental.structure[condition==condition, `biological replicate`])
+    unique.biological.replicates <- unique(experimental.structure[condition == condition, biological.replicate])
     
     # Get the technical replicates 
-    unique.technical.replicates <-  unique(experimental.structure[condition==condition, `technical replicate`])
+    unique.technical.replicates <-  unique(experimental.structure[condition == condition, technical.replicate])
     
     # Get the fractions
-    unique.fractions <- unique(experimental.structure[condition==condition, `fraction`])
+    unique.fractions <- unique(experimental.structure[condition == condition, fraction])
     
     # Now wrap the number of each a list
     condition.metadata <- list("number.of.biological.replicates" = length(unique.biological.replicates),
@@ -615,43 +620,36 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   evidence.column.names <- colnames(evidence.data)
   
   # Find the number of occurences of the Protein Names/Protein names (depending on the version)
-  number.of.Protein.Names.columns <- length(which(protein.groups.column.names == "Protein Names"))
-  number.of.Protein.names.columns <- length(which(protein.groups.column.names == "Protein names"))
+  number.of.protein.names.columns <- length(which(protein.groups.column.names == "protein.names"))
   
   # If there is no Protein Names column
-  if(number.of.Protein.Names.columns == 0 && number.of.Protein.names.columns == 0){
+  if (number.of.protein.names.columns == 0) {
     
     # Construnt one using the FASTA headers e.g. the fasta header
     # >PROT123 SWISS-PROT: PROT123 my favourite protein;>PROT123 SWISS-PROT: PROT123 my second favourite protein
     # will only keep the first entry (everything after ';' will be ingored) and it will also remove
     # the >PROT123 part
-    protein.groups.data[, "Protein Names":= gsub("(^>[[:alnum:]]+[[:punct:][:blank:]])|(;>.*)|(;[[:alnum:]]+)",
+    protein.groups.data[, protein.names := gsub("(^>[[:alnum:]]+[[:punct:][:blank:]])|(;>.*)|(;[[:alnum:]]+)",
                                                  "",
-                                                 protein.groups.data[, `Fasta headers`],
+                                                 protein.groups.data[, fasta.headers],
                                                  perl = TRUE)]
-  }
-  
-  # If the column exists just rename it
-  if (number.of.Protein.names.columns > 0)
-  {
-    setnames(protein.groups.data, "Protein names", "Protein Names")
   }
   
   # Reset the column names of the protein groups file
   protein.groups.column.names <- colnames(protein.groups.data)
   
   # Order the table by the Evidence IDs for fast conditional empty line remove
-  setkey(protein.groups.data, `Evidence IDs`)
+  setkey(protein.groups.data, evidence.ids)
   
   # Remove lines with empty Evidence IDs
   protein.groups.data <- protein.groups.data[!""]
   
   # In the protein groups file does not contain the column Protein IDs, but contains the column Peptide IDs,
   # rename the Peptide IDs to Protein IDs
-  if (!"Protein IDs" %in% protein.groups.column.names &
-      "Peptide IDs" %in% protein.groups.column.names)
+  if (!"protein.ids" %in% protein.groups.column.names &
+       "peptide.ids" %in% protein.groups.column.names)
   {
-    setnames(protein.groups.data, "Peptide IDs", "Protein IDs")
+    setnames(protein.groups.data, "peptide.ids", "protein.ids")
   }
   
   # Subset the protein groups data.table keeping only the Protein IDs, Protein Names and Evidence IDs columns
@@ -1318,14 +1316,14 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
     # Explicit handling for the Proteome Discoverer as there are differences between versions
     protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
   } else {
-    protein.groups.column <- '^Proteins$'
+    protein.groups.column <- "proteins"
   }
   
   # Get the index of the protein groups accessions column
   protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
   
   # And rename it as Protein IDs
-  evidence.column.names[protein.groups.column.position] <- "Protein IDs"
+  evidence.column.names[protein.groups.column.position] <- "protein.ids"
   
   # Reset evidence column names
   evidence.column.names <- colnames(evidence.data)
