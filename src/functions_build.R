@@ -655,41 +655,31 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # Subset the protein groups data.table keeping only the Protein IDs, Protein Names and Evidence IDs columns
   protein.groups.subset <- protein.groups.data[ , 
                                                .SD,
-                                               .SDcols = c("Protein IDs",
-                                                            "Protein Names",
-                                                            "Evidence IDs")]
+                                               .SDcols = c("protein.ids",
+                                                            "protein.names",
+                                                            "evidence.ids")]
   # Break the each Evidence IDs cell in multiple by the ';' and merge them by their corresponding Protein ID and
   # Protein Name
+  protein.groups.subset.multiline.evidence <- cSplit(protein.groups.subset, "evidence.ids", ";", "long")
   
-  protein.groups.subset.multiline.evidence <- cSplit(protein.groups.subset, "Evidence IDs", ";", "long")
-  # My old implementation, but cSplit did the job faster!
-  # protein.groups.subset.multiline.evidence <- protein.groups.subset[ ,
-  #                                                                    list(`Evidence IDs` = unlist(strsplit(`Evidence IDs`,
-  #                                                                                                           ";"))),
-  #                                                                    by = list(`Protein IDs`, `Protein Names`)]
  
   # Rename Evidence IDs column to ID in the multiple evidence table
   setnames(protein.groups.subset.multiline.evidence,
-           "Evidence IDs",
-           "ID")
+           "evidence.ids",
+           "id")
   
   # Change the class of the column from string to integer
-  class(protein.groups.subset.multiline.evidence$ID) <- 'integer'
+  class(protein.groups.subset.multiline.evidence$id) <- 'integer'
   
   # Order the protein.groups.subset.multiline.evidence by the id column
-  setkey(protein.groups.subset.multiline.evidence, ID)
-  
-  # Renames the evidence data column name id to ID
-  setnames(evidence.data,
-           "id",
-           "ID")
+  setkey(protein.groups.subset.multiline.evidence, id)
   
   # Now order the id column in the evidence file
-  setkey(evidence.data, ID)
+  setkey(evidence.data, id)
   
   # Make a unique code id the if the Protein IDs or Protein Names column exist
-  column.delete.case <- (any(grepl("Protein IDs", evidence.column.names, perl = TRUE)) * 1) +
-                        (any(grepl("Protein Names", evidence.column.names, perl = TRUE)) * 2) + 1
+  column.delete.case <- (any(grepl("protein.ids", evidence.column.names, perl = TRUE)) * 1) +
+                        (any(grepl("protein.names", evidence.column.names, perl = TRUE)) * 2) + 1
   
   # Depending on the code, delete the appropriate columns
   # Unique Codes:
@@ -700,9 +690,9 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   #
   switch(column.delete.case,
          cat("No need for column deletion...\n"),
-         evidence.data[, "Protein IDs" := NULL],
-         evidence.data[, "Protein Names" := NULL],
-         evidence.data[, c("Protein IDs", "Protein Names") := NULL])
+         evidence.data[, "protein.ids" := NULL],
+         evidence.data[, "protein.names" := NULL],
+         evidence.data[, c("protein.ids", "protein.names") := NULL])
   
   # Reset the column names of the evidence file
   evidence.column.names <- colnames(evidence.data)
@@ -711,11 +701,11 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
   # make the data.table that we should have in the first place
   merged.evidence.table <- merge(protein.groups.subset.multiline.evidence,
                                  evidence.data,
-                                 by = "ID",
+                                 by = "id",
                                  all = TRUE)
   
   # Order the corrected evidence data.table by id
-  setkey(merged.evidence.table, ID)
+  setkey(merged.evidence.table, id)
   
   # Wrap the corrected files in a list
   corrected.files <- list("protein.groups.data"= protein.groups.data, "evidence.data" = merged.evidence.table)
@@ -768,27 +758,31 @@ get.evidence.metadata <- function(evidence.columns, data.origin, is.label.free, 
   # Depending on the MaxQuant version there are might be slight 
   # differences in the column names
   if (status.code == 2 | status.code == 4) {
-    if ("Raw File" %in% evidence.columns == TRUE) {
-      maxquant.raw.file.column <- "Raw File"
-    } else {
-      maxquant.raw.file.column <- "Raw file"
-    }
+      maxquant.raw.file.column <- "raw.file"
   }
   
   switch( status.code,
-          metadata <- set.evidence.metadata("Spectrum File", "Modifications"), 
-          metadata <- set.evidence.metadata(maxquant.raw.file.column, "Labeling State"), 
           {
-           if (is.isobaric == TRUE) {
-             metadata <- set.evidence.metadata("Spectrum File", "Modifications")
+            # 1: Proteome Discoverer and labeled experiment
+            metadata <- set.evidence.metadata("spectrum.file", "modifications")
+          },
+          {
+            # 2: MaxQuant and labeled experiment
+            metadata <- set.evidence.metadata(maxquant.raw.file.column, "labeling.state")
+          },
+          {
+            # 3: Proteome Discoverer and label-free experiment OR Isobaric!     ### BEWARE  ### 
+            if (is.isobaric == TRUE) {
+             metadata <- set.evidence.metadata("spectrum.file", "modifications")
            } else {
-             metadata <- set.evidence.metadata("Spectrum File", "Spectrum File")
+             metadata <- set.evidence.metadata("spectrum.file", "spectrum.file")
            }
           },
           {
+            # 4: MaxQuant and label-free experiment OR Isobaric!                ### BEWARE  ###
             # Correct for isobaric
             if (is.isobaric == TRUE) {
-              metadata <- set.evidence.metadata(maxquant.raw.file.column, "Labeling State")
+              metadata <- set.evidence.metadata(maxquant.raw.file.column, "labeling.state")
             } else {
               metadata <- set.evidence.metadata(maxquant.raw.file.column, maxquant.raw.file.column)
             }
@@ -913,48 +907,48 @@ trim.evidence.data.protein.descriptions <- function(evidence.data, protein.descr
   # Subset the evidence data and keep only the Protein IDs column and the Description Column
   evidence.subset <- evidence.data[,
                                    .SD,
-                                   .SDcols = c("Protein IDs",
+                                   .SDcols = c("protein.ids",
                                                protein.description.column)]
   
   # Add an index column for ordering
   evidence.subset[, index := c(1:nrow(evidence.data))]
   
   # Set the key to Protein IDs for later merging
-  setkey(evidence.subset, "Protein IDs")
+  setkey(evidence.subset, protein.ids)
   
   # Now make a table with the number of the occurences of each protein
   protein.occurences <- evidence.subset[,
                                         .(n=.N),
-                                        by="Protein IDs"]
+                                        by=protein.ids]
   
   # Set the key to Protein IDs for later merging
-  setkey(protein.occurences, "Protein IDs")
+  setkey(protein.occurences, protein.ids)
   
   # Now paste the columns Protein IDs/ Description and separate them with a ' ['
   evidence.subset[, 
-                  "Trimmed Protein Description" := do.call( paste,
+                  trimmed.protein.description := do.call( paste,
                                                             c(  .SD,
                                                                 sep = " [")), 
-                  .SDcols = c("Protein IDs",
+                  .SDcols = c("protein.ids",
                               protein.description.column)]
   
   # Keep only the first 60 characters of the description
   evidence.subset[,
-                  "Temp Trimmed Description" := gsub("^(.{60}).*",
+                  tmp.trimmed.protein.description:= gsub("^(.{60}).*",
                                                      "\\1",
-                                                     as.character(`Trimmed Protein Description`),
+                                                     as.character(trimmed.protein.description),
                                                      perl = TRUE)]
   
   # And finally paste the ']...' at the end of the trimmed description
   evidence.subset[, 
-                  "Trimmed Protein Description" := do.call( paste,
+                  trimmed.protein.description := do.call( paste,
                                                             c( .SD,
                                                                "]...",
                                                                sep = "")), 
-                  .SDcols = "Trimmed Protein Description"]
+                  .SDcols = "trimmed.protein.description"]
 
   # Order the table and get the trimmed protein descriptions
-  new.protein.ids <- protein.occurences[evidence.subset][order(index), `Trimmed Protein Description`]
+  new.protein.ids <- protein.occurences[evidence.subset][order(index), trimmed.protein.description]
   
   return (new.protein.ids)
 }
@@ -985,22 +979,23 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   evidence.data.reformed <- copy(evidence.data)
   
   # Add the new column and initialize it to ''
-  evidence.data.reformed[, "Condition":= ""]
+  evidence.data.reformed[, "condition":= ""]
   
-  # Make the pattern of the conditions that we want to compare
-  conditions.to.compare.pattern <- paste(conditions.to.compare, collapse = "|")
-  
-  # Find the ones to keep e.g. if I have the conditions Mutant1, Mutant2, Wild and 
-  # I want to focus on Mutant1 vs Wild
-  conditions.to.keep <- grepl(conditions.to.compare.pattern,
-                              names(conditions.to.raw.files.list),
-                              perl = TRUE)
-  
-  # Keep only the ones I need
-  trimmed.conditions.to.raw.files.list <- conditions.to.raw.files.list[conditions.to.keep]
-  
-  # Get the names of the conditions
-  trimmed.conditions <- names(trimmed.conditions.to.raw.files.list)
+  # TODO maybe this is not needed anymore
+  # # Make the pattern of the conditions that we want to compare
+  # conditions.to.compare.pattern <- paste(conditions.to.compare, collapse = "|")
+  # 
+  # # Find the ones to keep e.g. if I have the conditions Mutant1, Mutant2, Wild and 
+  # # I want to focus on Mutant1 vs Wild
+  # conditions.to.keep <- grepl(conditions.to.compare.pattern,
+  #                             names(conditions.to.raw.files.list),
+  #                             perl = TRUE)
+  # 
+  # # Keep only the ones I need
+  # trimmed.conditions.to.raw.files.list <- conditions.to.raw.files.list[conditions.to.keep]
+  # 
+  # # Get the names of the conditions
+  # trimmed.conditions <- names(trimmed.conditions.to.raw.files.list)
   
   # Make a status code for fast comparisons
   # 1:  # Proteome-Discoverer Isotopic
@@ -1020,26 +1015,41 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   condition.column <- evidence.metadata$condition
   
   # Now add the conditions to the condition column 
-  for (condition in trimmed.conditions) {
-    
-    # Get the raw files
-    condition.raw.files <- trimmed.conditions.to.raw.files.list[[condition]]
+  # TODO changed trimmed.conditions to inside the for
+  for (condition.to.compare in conditions.to.compare) {
     
     switch( status.code,
             { 
               # Proteome-Discoverer Labeled
               
               # Copy the evidence.condition column to the Condition
-              evidence.data.reformed[,Condition := get(condition.column)]
+              evidence.data.reformed[,condition := get(condition.column)]
+              
+              # Finally set the column as character basically for labeled experiments
+              evidence.data.reformed[, condition:=as.character(condition)]
+              
+              # Only one time is enough
+              break
             },
             {
               # MaxQuant Labeled
               
               # Copy the evidence.condition column to the Condition
-              evidence.data.reformed[,Condition := get(condition.column)]
+              evidence.data.reformed[,condition := get(condition.column)]
+              
+              # Finally set the column as character basically for labeled experiments
+              evidence.data.reformed[, condition:=as.character(condition)]
+              
+              # Only one time is enough
+              break
             },
             {
               # Proteome-Discoverer label-free
+              
+              # Get the raw files
+              condition.raw.files <- conditions.to.raw.files.list[[condition.to.compare]]
+              
+             
               condition.raw.files.pattern <- paste(condition.raw.files, collapse = "|")
               
               # Find which rows should should have the corresponding condition 
@@ -1048,13 +1058,16 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
                                             perl = TRUE)
               
               # Add the condition on these rows
-              evidence.data.reformed[indexes.of.condition, Condition := condition] 
+              evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
             },
             {
+              # MaxQuant label-free
+              
+              # Get the raw files
+              condition.raw.files <- conditions.to.raw.files.list[[condition.to.compare]]
               
               cat("Case MaxQuant Label free add compare column\n")
               
-              # MaxQuant label-free
               condition.raw.files.pattern <- paste(condition.raw.files, collapse = "|")
               
               # Find which rows should should have the corresponding condition 
@@ -1063,7 +1076,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
                                             perl = TRUE)
               
               # Add the condition on these rows
-              evidence.data.reformed[indexes.of.condition, Condition := condition] 
+              evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
             },
             {
               cat("Incorrect case in add.compare.column.to.evidence...\n")
@@ -1072,7 +1085,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               # Proteome-Discoverer Isobaric
               
               # Add the condition on these rows
-              evidence.data.reformed[,Condition := get(condition.column)]
+              evidence.data.reformed[,condition := get(condition.column)]
               
             },
             {
@@ -1080,36 +1093,112 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               # MaxQuant isobaric
               
               # Add the condition on these rows
-              evidence.data.reformed[, Condition:=get(condition.column)] 
+              evidence.data.reformed[, condition:=get(condition.column)] 
             })
-    
   }
   
   return (evidence.data.reformed)
 }
 
-clear.user.condition.na.rows <- function(evidence.data) {
+discard.useless.conditions.per.experiment <- function(evidence.data, conditions.to.compare, is.label.free, is.isobaric) {
+  #
+  # Removes the useless rows for the conditions in which we are not interested, dependingon the experimental setup
+  #
+  # Args:
+  #   evidence.data:          The evidence data.table
+  #   conditions.to.compare:  The vector with the condition I want to compare
+  #   is.label.free:          TRUE or FALSE depending on if it is an label-free experiment or not.
+  #   is.isobaric:            TRUE or FALSE depending on if it is an isobaric experiment or not.
+  #
+  # Returns:
+  #   The cleaned evidence data.table
+  #
+  
+  # Copy the data that i want to clean
+  cleaned.evidence.data <- copy(evidence.data)
+  
+  # Make an id to determine the experimental setup
+  case.id <-  (is.label.free * 1) + 
+              (is.isobaric * 2) + 1
+  
+  # By default clean all the blanks and the NAs
+  cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
+  cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
+  
+  # Now depending on the experimental setup remove the appropropriate rows
+  switch(case.id,
+         {
+            # Isotopic Labeled Experiment
+            silac.labels <- list(L="0", M="1", H="2")
+           
+            silac.label.to.compare.1 <- silac.labels[[conditions.to.compare[[1]]]]
+            silac.label.to.compare.2 <- silac.labels[[conditions.to.compare[[2]]]]
+            
+            condition.labels.in.evidence.data <- as.character(unique(evidence.data$condition))
+            
+            condtitions.to.remove <- setdiff( condition.labels.in.evidence.data,
+                                              c(silac.label.to.compare.1,
+                                                silac.label.to.compare.2,
+                                                NA,
+                                                ""))
+            for (condition in condtitions.to.remove) {
+              cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, condition)
+            }
+            
+         },
+         {
+            # Label-free Experiment
+            # cleaned.evidence.data <- clear.user.condition.rows(evidence.data,"BLANK")
+         },
+         {
+           # Isobaric Labeled Experiment
+          })
+  
+  return (cleaned.evidence.data)
+}
+
+clear.user.condition.rows <- function(evidence.data, condition.to.remove) {
   #
   # Clears the evidence data from rows with unassigned condition
   #
   # Args:
-  #   evidence.data: The evidence data table
-  #
+  #   evidence.data:        The evidence data table
+  #   condition.to.remove:  The condition to remove
   # Returns:
   #   The cleaned data.table
   #
   
-  # Make a copy of the evidence.data
-  clear.evidence.data <- copy(evidence.data)
-  
   # Order the table by Condition
-  setkey(clear.evidence.data, Condition)
+  setkey(evidence.data, condition)
   
-  # Clear the unassigned rows
-  clear.evidence.data <- clear.evidence.data[!""]
+  switch(condition.to.remove,
+         "BLANK" = {
+           # Clear the empty condition rows. We put BLANK instead of "" because the empty string is not valid!
+           clear.evidence.data <- evidence.data[!""]
+         },
+         "-1" = {
+           # Clear the empty condition rows
+           clear.evidence.data <- evidence.data[!"-1"]
+         },
+         "0" = {
+           # Clear the empty condition rows
+           clear.evidence.data <- evidence.data[!"0"]
+         },
+         "1" = {
+           # Clear the empty condition rows
+           clear.evidence.data <- evidence.data[!"1"]
+         },
+         "2" = {
+           # Clear the empty condition rows
+           clear.evidence.data <- evidence.data[!"2"]
+         },
+         "NA" = {
+           # Clear the empty condition rows
+           clear.evidence.data <- na.omit(evidence.data, cols = "condition")
+         })
   
   # And reset the order to the Protein IDs
-  setkey(clear.evidence.data, "Protein IDs")
+  setkey(clear.evidence.data, "protein.ids")
   
   return (clear.evidence.data)
 }
@@ -1304,6 +1393,15 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   #   A tranformed data.table with only the needed column for the analysis
   #
   
+  # TODO Remove test
+  if (project.variables$development.stage == TRUE) {
+    protein.groups.data <- global.variables$protein.groups.data
+    evidence.data <- global.variables$evidence.data
+    data.origin <- global.variables$dataset.origin
+    is.label.free <- global.variables$is.label.free
+    is.isobaric <- global.variables$is.isobaric
+  }
+  
   # Initialize the protein groups column
   protein.groups.column <- ""
   
@@ -1336,14 +1434,14 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   }
   
   # Order the evidence.data by the Protein IDs
-  setkey(evidence.data, `Protein IDs`)
+  setkey(evidence.data, protein.ids)
   
   # And remove any row with empty Protein IDs
   evidence.data <- evidence.data[!""]
   
   # In the case of an isobaric labeled experiment we can treat is as if it was label-free,
   # after some reformating 
-  if(is.isobaric == TRUE) {
+  if (is.isobaric == TRUE) {
     
     cat("We have an isobaric label file!\n")
     # Reform the evidence data table
@@ -1357,21 +1455,24 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   evidence.column.names <- colnames(evidence.data)
   
   if (data.origin == "MaxQuant") {
-    protein.description.column <- "Protein Names"
+    protein.description.column <- "protein.names"
   } else {
-    protein.description.column <- "Protein Descriptions"
+    protein.description.column <- "protein.descriptions"
     if (! protein.description.column %in% evidence.column.names) {
-      evidence.data[, `Protein Descriptions` := ""]
+      evidence.data[, protein.descriptions := ""]
     }
   }
 
   # Paste and trim the evidence protein ids  with the appropriate protein description column
   # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
-  evidence.data$`Protein IDs` <- trim.evidence.data.protein.descriptions(evidence.data,
+  evidence.data$protein.ids <- trim.evidence.data.protein.descriptions(evidence.data,
                                                                          protein.description.column)
   
   # Store the raw.file column and the condition/label column depending on the data origin
-  evidence.metadata <- get.evidence.metadata(colnames(evidence.data), data.origin, is.label.free, is.isobaric)
+  evidence.metadata <- get.evidence.metadata(colnames(evidence.data),
+                                             data.origin,
+                                             is.label.free,
+                                             is.isobaric)
   
   # Add a column with the user defined conditions to compare
   evidence.data <- add.user.condition.column.to.evidence(evidence.data,
@@ -1382,13 +1483,18 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                     is.label.free,
                                                     is.isobaric)
   
-  # Clear the data from the rows with unassigned condition
-  evidence.data <- clear.user.condition.na.rows(evidence.data)
+  # Clear the data from the rows with specific condition depending on the experiment
+  evidence.data <- discard.useless.conditions.per.experiment( evidence.data,
+                                                              conditions.to.compare,
+                                                              is.label.free,
+                                                              is.isobaric)
+  
   
   evidence.data <- merge(evidence.data,
                          global.variables$experimental.structure,
                          by.x = c(evidence.metadata$raw.file),
-                         by.y = c("raw file"))
+                         by.y = "raw.file")
+  
   # Finally prepare the evidence to have a common format across experimental setups
   evidence.data <- bring.data.to.common.format( evidence.data,
                                                 data.origin,

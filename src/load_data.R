@@ -107,7 +107,22 @@ colnames(evidence.data) <- trimmed.and.lowercased.column.names
 # The needed columns for the analysis depending on the software
 if (dataset.origin == "MaxQuant") {
   evindence.columns.to.keep <- c("proteins",
-                                 "raw.file")  
+                                 "raw.file",
+                                 "protein.ids",
+                                 "protein.names",
+                                 "id",
+                                 "protein.descriptions",
+                                 "labeling.state")
+  
+  # In any case, we take the intersection
+  evindence.columns.subset <- intersect(colnames(evidence.data),
+                                             evindence.columns.to.keep)
+  
+  # Now subset the columns to keep only the needed, in order to make
+  # the data.table as light-weight as possible
+  evidence.data <- evidence.data[, .SD, .SDcols = evindence.columns.subset]
+  
+  
 } else {
   # Case proteome discoverer
   evindence.columns.to.keep <- c()
@@ -171,7 +186,8 @@ if (dataset.origin == "MaxQuant") {
                                       "reverse",
                                       "contaminant",
                                       "id",
-                                      "peptide.ids")
+                                      "peptide.ids",
+                                      "evidence.ids")
   
   # In any case, we take the intersection
   protein.groups.columns.subset <- intersect(colnames(protein.groups.data),
