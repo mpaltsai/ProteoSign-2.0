@@ -25,6 +25,7 @@ analysis.metadata <- read.csv(analysis.metadata.file,
 global.variables <- list()
 
 # Initialize the global variables with the analysis parameters
+global.variables[["analysis.name"]] <- analysis.metadata$analysis.name
 global.variables[["replicate.multiplexing.is.used"]] <- analysis.metadata$replicate.multiplexing.is.used
 global.variables[["dataset.origin"]] <- analysis.metadata$dataset.origin
 global.variables[["is.label.free"]]  <- analysis.metadata$is.label.free
@@ -104,18 +105,34 @@ trimmed.and.lowercased.column.names <- trim.and.lowercase.column.names(evidence.
 # Set the trimmed and lowercase the evidence columns
 colnames(evidence.data) <- trimmed.and.lowercased.column.names
 
+evidence.data.column.names <- colnames(evidence.data)
 # The needed columns for the analysis depending on the software
 if (dataset.origin == "MaxQuant") {
+  
+  # Get the "intensity.X" columns where X stands for l, m, h respectivelly
+  intensity.columns <- grep("^intensity\\.", evidence.data.column.names,perl = TRUE, value = TRUE)
+  
+  # Get the conditions to compare
+  conditions.to.compare <- global.variables$conditions.to.compare
+  
+  # Make a pattern e.g "(h|m)$"
+  conditions.to.compare.pattern <- paste0("(", tolower(conditions.to.compare), ")$", collapse = "|")
+  
+  # And keep only the intensity columns I want to compare
+  intensity.columns <- grep(conditions.to.compare.pattern, intensity.columns, perl = TRUE, value = TRUE)
+  
   evindence.columns.to.keep <- c("proteins",
                                  "raw.file",
                                  "protein.ids",
                                  "protein.names",
                                  "id",
                                  "protein.descriptions",
-                                 "labeling.state")
+                                 "peptide.id",
+                                 "unique.sequence.id",
+                                 intensity.columns)
   
   # In any case, we take the intersection
-  evindence.columns.subset <- intersect(colnames(evidence.data),
+  evindence.columns.subset <- intersect(evidence.data.column.names,
                                              evindence.columns.to.keep)
   
   # Now subset the columns to keep only the needed, in order to make
@@ -125,7 +142,8 @@ if (dataset.origin == "MaxQuant") {
   
 } else {
   # Case proteome discoverer
-  evindence.columns.to.keep <- c()
+  evindence.columns.to.keep <- c("unique.sequence.id",
+                                 "annotated.sequence")
 }
 
 cat("Evidence file loaded!\n")
@@ -205,5 +223,14 @@ if (dataset.origin == "MaxQuant") {
 }
 
 cat("========== End of load_data.R ==========\n")
-
-
+# 
+# # Remove the load_data.R and functions_load_data.R functions from the enviroment
+# functions.in.load_data.R <- list.functions.in.file("load_data.R")
+# functions.in.load_data.R <- functions.in.load_data.R$.GlobalEnv
+# 
+# 
+# functions.in.functions_load_data.R <- list.functions.in.file("functions_load_data.R")
+# functions.in.functions_load_data.R <- functions.in.functions_load_data.R$.GlobalEnv
+# 
+# rm(list = c(functions.in.load_data.R, functions.in.functions_load_data.R))
+# 

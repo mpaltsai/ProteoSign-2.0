@@ -24,6 +24,8 @@ experimental.structure <- global.variables[["experimental.structure"]]
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
 is.label.free <- global.variables[["is.label.free"]]
 replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
+evidence.data <- global.variables[["evidence.data"]]
+protein.groups.data <- global.variables[["protein.groups.data"]]
 
 # Order the experimental structure by raw.file name
 experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
@@ -92,24 +94,24 @@ if (biological.replicates.number.status  == FALSE) {
 
 # Make a list of list where each element is a condition paired
 # with its biological and technical replicates
-replicates.per.condition <- replicates.per.condition(biological.replicates.list,
+replicates.per.condition.list <- replicates.per.condition(biological.replicates.list,
                                                      technical.replicates.list,
                                                      experimental.conditions.list)
 
 # Make a list of list where each element is a condition paired
 # with booleans regarding the correctness of biological and technical replicates
-replicates.status.per.condition <- replicates.status.per.condition(replicates.per.condition)
+replicates.status.per.condition.list <- replicates.status.per.condition(replicates.per.condition.list)
 
 # Find the problematic replicates and fix them
-fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition,
-                                                               replicates.status.per.condition,
+fixed.replicates.per.condition <- fix.replicates.per.condition(replicates.per.condition.list,
+                                                               replicates.status.per.condition.list,
                                                                is.label.free)
 
 # Reset the with the corrected replicates
-replicates.per.condition <- fixed.replicates.per.condition
+replicates.per.condition.list <- fixed.replicates.per.condition
 
 # Make a list with the corrected replicates concatenated
-restored.replicates <- restore.replicates(replicates.per.condition)
+restored.replicates <- restore.replicates(replicates.per.condition.list)
 
 # Are the biological and the technical replicates different from the initial data, provided by the user?
 biological.replicates.are.the.same <- Reduce("&", biological.replicates.list == restored.replicates$biological.replicates)
@@ -182,9 +184,11 @@ global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(technical.replicate)],
                                                            by = biological.replicate]$technical.replicate)
 
+evidence.data <- zeros.to.nas(evidence.data)
+
 # Now build the analysis data 
 analysis.data <- build.analysis.data(protein.groups.data = global.variables$protein.groups.data,
-                                     evidence.data       = global.variables$evidence.data,
+                                     evidence.data       = evidence.data,
                                      data.origin         = global.variables$dataset.origin,
                                      is.label.free       = global.variables$is.label.free,
                                      is.isobaric         = global.variables$is.isobaric)
@@ -194,18 +198,54 @@ global.variables[["analysis.data"]] <- analysis.data
 
 cat("after analysis data\n")
 
-# Cast the multiline conditions to 2 columns Condition1 Condition2 with their peptides' intensities
-analysis.data <- dcast.data.table(analysis.data[, 
-                                                    by=.(`description`,
-                                                          `Protein IDs`,
-                                                         `Unique Sequence ID`,
-                                                         `Condition`)],
-                                         `description` + `Protein IDs` + `Unique Sequence ID` ~ `Condition`,
-                                         value.var = "Intensities",
-                                         fill = NA)
+# Now depending on the condition column type we will do different operations on the evidence.data
+experiment.type <- unique(analysis.data$condition)
 
-# Keep only the peptides that were present in both conditions
-analysis.data <- na.omit(analysis.data, cols = conditions.to.compare)
+# If we are on an Isotopic Experiment
+if (experiment.type == "Labeled Experiment") {
+  
+  # Find the Intensity column names
+  intensity.columns <- grep("^intensity", colnames(analysis.data), perl = TRUE, value = TRUE)
+  
+  # Find the rows on those columns that contain NA
+  na.rows.conditon.A <- which(is.na(analysis.data[[intensity.columns[1]]]) == TRUE)
+  na.rows.conditon.B <- which(is.na(analysis.data[[intensity.columns[2]]]) == TRUE)
+  
+  # Take their union
+  na.rows <- union(na.rows.conditon.A, na.rows.conditon.B)
+  
+  # And remove those rows in order to have rows where we have measurements in both conditions
+  analysis.data <- analysis.data[-c(na.rows), ]
+  
+  # Discard the condition columns as now there is no need for it
+  analysis.data <- analysis.data[, condition:=NULL]
+  
+  # Find the position of the intensity columns
+  intensity.columns.position <- grep("^intensity", colnames(analysis.data), perl = TRUE)
+  
+  # Discard the "intensity." part of each "intensity.x"
+  intensity.columns <- gsub(".*\\.", "", intensity.columns, perl = TRUE)
+  
+  # Uppercase the condition column names
+  intensity.columns <- toupper(intensity.columns)
+  
+  # And restore the condition column names
+  colnames(analysis.data)[intensity.columns.position] <- intensity.columns
+  
+} else {
+  # Cast the multiline conditions to 2 columns Condition1 Condition2 with their peptides' intensities
+  analysis.data <- dcast.data.table(analysis.data[, 
+                                                  by=.( description,
+                                                        protein.ids,
+                                                        unique.sequence.id,
+                                                        condition)],
+                                    description + protein.ids + unique.sequence.id ~ condition,
+                                    value.var = "intensities",
+                                    fill = NA)
+  
+  # Keep only the peptides that were present in both conditions
+  analysis.data <- na.omit(analysis.data, cols = conditions.to.compare) 
+}
 
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
@@ -215,16 +255,16 @@ global.variables[["evidence.data"]] <- NULL
 
 global.variables[["protein.groups.data"]] <- NULL
 
-# Remove the build.R and functions_build.R from the enviroment
-functions.in.build.R <- list.functions.in.file("build.R")
-functions.in.build.R <- functions.in.build.R$.GlobalEnv
-
-functions.in.functions_build.R <- list.functions.in.file("functions_build.R")
-functions.in.functions_build.R <- functions.in.functions_build.R$.GlobalEnv
-
-rm(list = c(functions.in.build.R, functions.in.functions_build.R))
-
-
 cat("========== End of build.R ==========\n")
 
-
+# 
+# # Remove the build.R and functions_build.R from the enviroment
+# functions.in.build.R <- list.functions.in.file("build.R")
+# functions.in.build.R <- functions.in.build.R$.GlobalEnv
+# 
+# 
+# functions.in.functions_build.R <- list.functions.in.file("functions_build.R")
+# functions.in.functions_build.R <- functions.in.functions_build.R$.GlobalEnv
+# rm(list = c(functions.in.build.R, functions.in.functions_build.R))
+# 
+# 

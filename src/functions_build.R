@@ -978,9 +978,6 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   # Copy the evidence data in order to dodge the data.table bug
   evidence.data.reformed <- copy(evidence.data)
   
-  # Add the new column and initialize it to ''
-  evidence.data.reformed[, "condition":= ""]
-  
   # TODO maybe this is not needed anymore
   # # Make the pattern of the conditions that we want to compare
   # conditions.to.compare.pattern <- paste(conditions.to.compare, collapse = "|")
@@ -1010,6 +1007,15 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
                   (is.isobaric * 3) + 1
   
   
+  
+  # If we are on an isotopic experiment, there is no need to add the condition column
+  if (status.code == 1  | status.code == 2) {
+    return (evidence.data.reformed)
+  }
+  
+  # Add the new column and initialize it to ''
+  evidence.data.reformed[, "condition":= ""]
+  
   # TODO maybe for labeled PD the column should be Quan channel
   # Get the evidence metadata depending on the data origin and the experiment type
   condition.column <- evidence.metadata$condition
@@ -1022,26 +1028,12 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
             { 
               # Proteome-Discoverer Labeled
               
-              # Copy the evidence.condition column to the Condition
-              evidence.data.reformed[,condition := get(condition.column)]
-              
-              # Finally set the column as character basically for labeled experiments
-              evidence.data.reformed[, condition:=as.character(condition)]
-              
-              # Only one time is enough
-              break
+              stop("add.user.condition illegan case in switch!\n")
             },
             {
               # MaxQuant Labeled
               
-              # Copy the evidence.condition column to the Condition
-              evidence.data.reformed[,condition := get(condition.column)]
-              
-              # Finally set the column as character basically for labeled experiments
-              evidence.data.reformed[, condition:=as.character(condition)]
-              
-              # Only one time is enough
-              break
+              stop("add.user.condition illegan case in switch!\n")
             },
             {
               # Proteome-Discoverer label-free
@@ -1122,54 +1114,47 @@ discard.useless.conditions.per.experiment <- function(evidence.data, conditions.
               (is.isobaric * 2) + 1
   
   # By default clean all the blanks and the NAs
-  cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
-  cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
   
   # Now depending on the experimental setup remove the appropropriate rows
   switch(case.id,
          {
-            # Isotopic Labeled Experiment
-            silac.labels <- list(L="0", M="1", H="2")
-           
-            silac.label.to.compare.1 <- silac.labels[[conditions.to.compare[[1]]]]
-            silac.label.to.compare.2 <- silac.labels[[conditions.to.compare[[2]]]]
             
-            condition.labels.in.evidence.data <- as.character(unique(evidence.data$condition))
-            
-            condtitions.to.remove <- setdiff( condition.labels.in.evidence.data,
-                                              c(silac.label.to.compare.1,
-                                                silac.label.to.compare.2,
-                                                NA,
-                                                ""))
-            for (condition in condtitions.to.remove) {
-              cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, condition)
-            }
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
             
          },
          {
             # Label-free Experiment
-            # cleaned.evidence.data <- clear.user.condition.rows(evidence.data,"BLANK")
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
          },
          {
            # Isobaric Labeled Experiment
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
           })
   
   return (cleaned.evidence.data)
 }
 
-clear.user.condition.rows <- function(evidence.data, condition.to.remove) {
+clear.user.condition.rows <- function(evidence.data, condition.to.remove, by.column = "condition") {
   #
   # Clears the evidence data from rows with unassigned condition
   #
   # Args:
   #   evidence.data:        The evidence data table
   #   condition.to.remove:  The condition to remove
+  #   by.column:            Default value is "condition" column.  The column that the filtering will be based on
   # Returns:
   #   The cleaned data.table
   #
   
-  # Order the table by Condition
-  setkey(evidence.data, condition)
+  # Order the table by Condition or Raw.file depending on the experiment
+  if (by.column == "condition") {
+    setkey(evidence.data, condition)
+  } else {
+    setkey(evidence.data, raw.file)
+  }
   
   switch(condition.to.remove,
          "BLANK" = {
@@ -1193,8 +1178,13 @@ clear.user.condition.rows <- function(evidence.data, condition.to.remove) {
            clear.evidence.data <- evidence.data[!"2"]
          },
          "NA" = {
-           # Clear the empty condition rows
-           clear.evidence.data <- na.omit(evidence.data, cols = "condition")
+           if (by.column == "condition") {
+             # Clear the NA condition rows
+             clear.evidence.data <- na.omit(evidence.data, cols = "condition")
+           } else {
+             # Clear the NA raw.file rows
+             clear.evidence.data <- na.omit(evidence.data, cols = "raw.file")
+           }
          })
   
   # And reset the order to the Protein IDs
@@ -1226,8 +1216,9 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
   # If data come from the MaxQuant  rename the 'Peptide ID' to 'Unique Sequence ID'
   # If data come form Proteome-Discoverer the column maybe already exists
   if (data.origin == "MaxQuant") {
-    if ("Peptide ID" %in% evidence.columns == TRUE) {
-      setnames(evidence.data,"Peptide ID", "Unique Sequence ID")
+    
+    if ("peptide.id" %in% evidence.columns == TRUE) {
+      setnames(evidence.data,"peptide.id", "unique.sequence.id")
     }
     
     # Renew the evidence columns vector
@@ -1236,10 +1227,10 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
     # Clean 'Intensity' part from 'Intensity XYZ' columns
     # Not sure...
     if (is.isobaric == FALSE) {
-      colnames(evidence.data) <- sub('Intensity (.+)',
-                                     "\\1",
-                                     evidence.columns,
-                                     perl = TRUE)
+      # colnames(evidence.data) <- sub('intensity\\.(.+)',
+      #                                "\\1",
+      #                                evidence.columns,
+      #                                perl = TRUE)
     } else {
       # yorgodilo had something commented here...
     }
@@ -1251,21 +1242,22 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
   # If data come form Proteome-Discoverer and the the column 'Unique Sequence ID'
   # still does not exist, rename the 'Annotated Sequence'
   # Not sure...
-  if ("Unique Sequence ID" %in% evidence.columns == FALSE &
-      "Annotated Sequence" %in% evidence.columns == TRUE) {
+  if ("unique.sequence.id" %in% evidence.columns == FALSE &
+      "annotated.sequence" %in% evidence.columns == TRUE) {
     
-    setnames(evidence.data,"Annotated Sequence", "Unique Sequence ID")
-    evidence[, "Unique Sequence ID" := sub(".*? (.*?) .*",
+    setnames(evidence.data, "annotated.sequence", "unique.sequence.id")
+    
+    evidence[, unique.sequence.id := sub(".*? (.*?) .*",
                                            "\\1",
-                                           evidence$"Unique Sequence ID")]
+                                           evidence$unique.sequence.id)]
   }
   
   # TODO check with real data!
   evidence.columns <- colnames(evidence.data)
   
-  if ("Quan Usage" %in% evidence.columns == FALSE &
-      "Peptide Quan Usage" %in% evidence.columns == TRUE) {
-    setnames(evidence.data, "Peptide Quan Usage", "Quan Usage")
+  if ("quan.usage" %in% evidence.columns == FALSE &
+      "peptide.quan.usage" %in% evidence.columns == TRUE) {
+    setnames(evidence.data, "peptide.quan.usage", "quan.usage")
   }
   
   # Renew the evidence columns vector
@@ -1288,31 +1280,63 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
             # 1:  Proteome-Discoverer Labeled
             # TODO
             evidence.data.subset <- evidence.data[, .SD,
-                                                    .SDcols = c("Quan Usage",
-                                                                "Protein IDs",
-                                                                "Unique Sequence ID",
+                                                    .SDcols = c("quan.usage",
+                                                                "protein.ids",
+                                                                "unique.sequence.id",
                                                                 intensity.columns,
-                                                                "Condition",
+                                                                "condition",
                                                                 "description")]
           
             setkey(evidence.data.subset, 
                    "description",
-                   "Protein IDs",
-                   "Unique Sequence ID")  
+                   "protein.ids",
+                   "unique.sequence.id")  
           },
           {
-          # 2:  MaxQuant Labeled
+            # 2:  MaxQuant Labeled
+            intensity.columns <- grep("^intensity", colnames(evidence.data), perl = TRUE, value = TRUE)
+            
+            
             evidence.data.subset <- evidence.data[, .SD,
-                                                  .SDcols = c("Protein IDs",
-                                                              "Unique Sequence ID",
+                                                  .SDcols = c("protein.ids",
+                                                              "unique.sequence.id",
                                                               intensity.columns,
-                                                              "Condition",
+                                                              "condition",
                                                               "description")]
             
             setkey(evidence.data.subset, 
                    "description",
-                   "Protein IDs",
-                   "Unique Sequence ID")    
+                   "protein.ids",
+                   "unique.sequence.id")
+            
+            # evidence.data.subset <- evidence.data.subset[, intensity.columns[2]:=NULL]
+            
+            intensity.column.1 <- intensity.columns[1]
+            
+            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            evidence.data.subset.1 <- evidence.data.subset[, 
+                                                         .("intensity.1" = list(get(intensity.column.1))),
+                                                         by=.(description,
+                                                              protein.ids,
+                                                              unique.sequence.id,
+                                                              condition)]
+            
+            setnames(evidence.data.subset.1, "intensity.1", intensity.column.1)
+            
+            intensity.column.2 <- intensity.columns[2]
+            
+            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            evidence.data.subset.2 <- evidence.data.subset[, 
+                                                           .("intensity.2" = list(get(intensity.column.2))),
+                                                           by=.(description,
+                                                                protein.ids,
+                                                                unique.sequence.id,
+                                                                condition)]
+            
+            setnames(evidence.data.subset.2, "intensity.2", intensity.column.2)
+            
+            evidence.data.subset <- merge(evidence.data.subset.1,
+                                          evidence.data.subset.2)
           },
           {
             # 3:  Proteome-Discoverer Label-free
@@ -1320,62 +1344,88 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
             # TODO Here we should use Precursor Area is unfortunately buggy (sometimes 0/NA), so we are
             # left with Intensity to work with. 
             # intensity.column <- "Precursor Area"            
-            intensity.column <- "Intensity"
+            intensity.column <- "intensity"
             
-            evidence.data.subset <- evidence.data[, .SD, .SDcols = c("Protein IDs",
-                                                                "Unique Sequence ID",
+            evidence.data.subset <- evidence.data[, .SD,
+                                                  .SDcols = c(  "protein.ids",
+                                                                "unique.sequence.id",
                                                                 intensity.column,
-                                                                "Condition",
+                                                                "condition",
                                                                 "description")]
             
-            setkey(evidence.data.subset,
-                   description,
-                   "Protein IDs",
-                   "Unique Sequence ID",
-                   Condition)
+            setkey( evidence.data.subset,
+                    description,
+                    protein.ids,
+                    unique.sequence.id,
+                    condition)
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
-                                                         .("Intensities" = paste(get(intensity.column), collapse = ";")),
+                                                         .("intensities" = paste(get(intensity.column),
+                                                                                 collapse = ";")),
                                                          by=.(description,
-                                                              `Protein IDs`,
-                                                              `Unique Sequence ID`,
-                                                              Condition)]
+                                                              protein.ids,
+                                                              unique.sequence.id,
+                                                              condition)]
           },
           {
             # 4:  MaxQuant Label-free
             
-            intensity.column <- "Intensity"
+            intensity.column <- "intensity"
             
             evidence.data.subset <- evidence.data[, .SD,
-                                                    .SDcols = c("Protein IDs",
-                                                                  "Unique Sequence ID",
+                                                    .SDcols = c(  "protein.ids",
+                                                                  "unique.sequence.id",
                                                                   intensity.column,
-                                                                  "Condition",
+                                                                  "condition",
                                                                   "description")]
             
             # evidence.data.subset <- na.omit(evidence.data.subset, "Intensity")
             
             setkey(evidence.data.subset,
                    description,
-                   "Protein IDs",
-                   "Unique Sequence ID",
-                   Condition)
+                   protein.ids,
+                   unique.sequence.id,
+                   condition)
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
                                                          # .("Test Intensities" = list(get(intensity.column))),
-                                                         .("Intensities" = list(get(intensity.column))),
+                                                         .("intensities" = list(get(intensity.column))),
                                                           by=.(description,
-                                                               `Protein IDs`,
-                                                               `Unique Sequence ID`,
-                                                               Condition)]
+                                                               protein.ids,
+                                                               unique.sequence.id,
+                                                               condition)]
 
             })
   
   return (evidence.data.subset)
 }
+
+zeros.to.nas <- function(evidence.data) {
+  #
+  #
+  #
+  #
+  #
+  #
+  #
+  #
   
+  data <- copy(evidence.data)
+  
+  # Find the Intensity column names
+  intensity.columns <- grep("^intensity", colnames(data), perl = TRUE, value = TRUE)
+  
+  zeros.A <- which(data[, get(intensity.columns[1])] == 0)
+  zeros.B <- which(data[, get(intensity.columns[2])] == 0)
+  
+  data <- data[zeros.A, eval(intensity.columns[1]) := NA]
+  data <- data[zeros.B, eval(intensity.columns[2]) := NA]
+  
+  return (data)
+}
+
 build.analysis.data <- function(protein.groups.data, evidence.data, data.origin, is.isobaric, is.label.free) {
   #
   # Combines the information from "protein.groups.data" and the "evidence.data" tables in one matrix,
@@ -1393,14 +1443,14 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   #   A tranformed data.table with only the needed column for the analysis
   #
   
-  # TODO Remove test
-  if (project.variables$development.stage == TRUE) {
-    protein.groups.data <- global.variables$protein.groups.data
-    evidence.data <- global.variables$evidence.data
-    data.origin <- global.variables$dataset.origin
-    is.label.free <- global.variables$is.label.free
-    is.isobaric <- global.variables$is.isobaric
-  }
+  # # TODO Remove test
+  # if (project.variables$development.stage == TRUE) {
+  #   protein.groups.data <- global.variables$protein.groups.data
+  #   evidence.data <- global.variables$evidence.data
+  #   data.origin <- global.variables$dataset.origin
+  #   is.label.free <- global.variables$is.label.free
+  #   is.isobaric <- global.variables$is.isobaric
+  # }
   
   # Initialize the protein groups column
   protein.groups.column <- ""
@@ -1465,8 +1515,8 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
 
   # Paste and trim the evidence protein ids  with the appropriate protein description column
   # e.g. 'ABC123' with 'ABC123 [DATABASEID:123 Tax_id=12345 Gene_Symbol=Abc123]...'
-  evidence.data$protein.ids <- trim.evidence.data.protein.descriptions(evidence.data,
-                                                                         protein.description.column)
+  evidence.data$protein.ids <- trim.evidence.data.protein.descriptions( evidence.data,
+                                                                        protein.description.column)
   
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data),
@@ -1494,6 +1544,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                          global.variables$experimental.structure,
                          by.x = c(evidence.metadata$raw.file),
                          by.y = "raw.file")
+  
   
   # Finally prepare the evidence to have a common format across experimental setups
   evidence.data <- bring.data.to.common.format( evidence.data,

@@ -14,8 +14,15 @@ rm(list = grep(paste(c("^global.variables",
 gc(verbose = FALSE,
    reset = TRUE)
 
+# Get the analysis name
+analysis.name <- global.variables$analysis.name
+
+# TODO do it a function
+# If it is bad, fix it 
+analysis.name <- gsub("[[:space:]|[:punct:]]", "-", analysis.name)
+
 # Make the limma output folder
-make.data.output.folders()
+make.data.output.folders(analysis.name)
 
 # 
 # make.Venn.diagram(evidence.data)
@@ -31,15 +38,15 @@ conditions.to.compare <- global.variables[["conditions.to.compare"]]
 experimental.metadata <- global.variables[["experimental.metadata"]]
 
 # Save the data.table to the intermediate-data
-save.intermediate.data.tables(analysis.data, deparse(substitute(analysis.data)))
+save.intermediate.data.tables(analysis.data, deparse(substitute(analysis.data)), analysis.name)
 
 ### FILTERING STEP ###
 
-# Filter out contaminants and reverse sequences
+# Filter out contaminants, reverse sequences and only identified by site
 filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
 
 # Save the data.table to the intermediate-data
-save.intermediate.data.tables(filtered.data, deparse(substitute(filtered.data)))
+save.intermediate.data.tables(filtered.data, deparse(substitute(filtered.data)), analysis.name)
 
 ### NORMALIZATION STEP ###
 
@@ -48,10 +55,10 @@ vsn.normalized.data <- do.vsn.normalization(filtered.data, conditions.to.compare
 not.normalized.data <- do.vsn.normalization(filtered.data,conditions.to.compare, do.norm = FALSE)
 
 # Plot the intensities before and after the normalizations
-do.peptide.intensities.plots(not.normalized.data, vsn.normalized.data)
+do.peptide.intensities.plots(not.normalized.data, vsn.normalized.data, analysis.name)
 
 # Save the data.table to the intermediate-data
-save.intermediate.data.tables(vsn.normalized.data, deparse(substitute(vsn.normalized.data)))
+save.intermediate.data.tables(vsn.normalized.data, deparse(substitute(vsn.normalized.data)), analysis.name)
 
 ### IMPUTATION ###
 
@@ -65,31 +72,31 @@ save.intermediate.data.tables(imputed.data, deparse(substitute(imputed.data)))
 aggregated.data <- do.peptides.aggregation(imputed.data)
 
 # Save the data.table to the intermediate-data
-save.intermediate.data.tables(aggregated.data, deparse(substitute(aggregated.data)))
+save.intermediate.data.tables(aggregated.data, deparse(substitute(aggregated.data)), analysis.name)
 
 # Do the QQ plots
-do.QQ.plots(aggregated.data, conditions.to.compare)
+do.QQ.plots(aggregated.data, conditions.to.compare, analysis.name)
 
 ### DIFFERENTIAL EXPRESSION ###
 
 limma.results <- do.limma.analysis(aggregated.data, conditions.to.compare, experimental.metadata, error.correction.method = "B")
 
 # Save the data.table to the intermediate-data
-save.intermediate.data.tables(limma.results, deparse(substitute(limma.results)), output.folder = "limma-output")
+save.intermediate.data.tables(limma.results, deparse(substitute(limma.results)), analysis.name, output.folder = "limma-output")
 
 ### PLOTS ###
 
 # Do the volcano plots
-do.volcano.plots(limma.results, conditions.to.compare, plots.format = 5, error.correction.method = "B")
+do.volcano.plots(limma.results, conditions.to.compare, analysis.name, plots.format = 5, error.correction.method = "B")
 
 # Do the fold change histograms
-do.fold.change.histogram(limma.results)
+do.fold.change.histogram(limma.results, conditions.to.compare, analysis.name)
 
 # Do the MA plots
-do.MA.plots(limma.results, conditions.to.compare)
+do.MA.plots(limma.results, conditions.to.compare, analysis.name)
 
 # Do value order plots
-do.value.ordered.ratio.plot(limma.results, conditions.to.compare)
+do.value.ordered.ratio.plot(limma.results, conditions.to.compare, analysis.name)
 
 
 # Remove the build.R and functions_build.R from the enviroment

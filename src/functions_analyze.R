@@ -1,8 +1,21 @@
-make.folder <- function(folder.name) {
+make.folder <- function(folder.name, analysis.name) {
+  #
+  # Makes a folder tree for the analysis, the root the analysis names and leafs
+  # the "limma-output", "plots", "intermediate-data" folders
+  #
+  # Args:
+  #   folder.name:    The folder name to create
+  #   analysis.name:  The analysis folder name
+  #
+  # Returns:
+  #   The newly created folders
+  #
   
+  # Get the data-output path
   data.output.path <- here("data-output")
   
-  folder.output <- paste(data.output.path, folder.name, sep = "/")
+  # Make the full path
+  folder.output <- paste(data.output.path, analysis.name, folder.name, sep = "/")
   
   # If folder already exist, remove it
   if( file.exists(folder.output) == TRUE) {
@@ -12,7 +25,7 @@ make.folder <- function(folder.name) {
   # And then create the new folder
   tryCatch(
     {
-      dir.create(folder.output)
+      dir.create(folder.output, recursive = TRUE)
       success.message <- paste0("Folder ", folder.output, " was created under ", data.output.path, "/!\n")
       cat(success.message)
     },
@@ -24,22 +37,25 @@ make.folder <- function(folder.name) {
     })
 }
 
-make.data.output.folders <- function() {
+make.data.output.folders <- function(analysis.name) {
   #
   # Makes the data output folders limma-output, plots 
   #
   # Args:
+  #   analysis.name: The name of the experiment e.g. "SILAC HUMAN"
   #
   # Returns:
   #   Prints a message if the folder was created successfully, otherwise terminates the analysis.
   #
+  
   # Set limma output path
   data.output.path <- here("data-output")
+  
   
   # Set limma output folder name
   folders.to.create <- c("limma-output", "plots", "intermediate-data")
   
-  invisible(lapply(folders.to.create, make.folder))
+  invisible(lapply(folders.to.create, make.folder, analysis.name))
   
 }
 
@@ -146,7 +162,7 @@ make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.tit
   setwd(here("src"))  
 }
 
-save.intermediate.data.tables <- function(data, file.name,
+save.intermediate.data.tables <- function(data, file.name, analysis.name,
                                           output.folder = "intermediate-data") {
   #
   # Saves the intermediate data.table into csv format
@@ -154,6 +170,7 @@ save.intermediate.data.tables <- function(data, file.name,
   # Args:
   #   data:           The data.table
   #   file.name:      The csv name
+  #   analysis.name:  The name of the experiment e.g. "SILAC HUMAN"
   #   output.folder:  Default is "intermediate-data". The folder to store the csvs
   #
   # Returns:
@@ -161,7 +178,7 @@ save.intermediate.data.tables <- function(data, file.name,
   #
   
   # Construct the output folder path
-  output.folder.path <- paste("data-output", output.folder, sep = "/")
+  output.folder.path <- paste("data-output", analysis.name, output.folder, sep = "/")
   
   # Change to the appropriate directory
   setwd(here(output.folder.path))
@@ -176,7 +193,7 @@ save.intermediate.data.tables <- function(data, file.name,
   fwrite(data, file = dashed.file.name)
   
   # Inform the user
-  cat(dashed.file.name, "saved under", here("data-output/intermediate-data"), "\n")
+  cat(dashed.file.name, "saved under", here(output.folder.path), "\n")
   
   # Change back to the src directory
   setwd(here("src"))
@@ -184,7 +201,7 @@ save.intermediate.data.tables <- function(data, file.name,
 
 filter.out.reverse.and.contaminants <- function(analysis.data) {
   #
-  # Removes Contamintants and Reverse flagged peptides from the evidence data
+  # Removes Contamintants, Reverse flagged peptides and only identified by site from the evidence data
   # 
   # Args:
   #   analysis.data: The analysis.data 
@@ -199,25 +216,27 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
   # Clean them from the Protein IDs starting with CON__ regarding the contaminants
   data.no.contaminants <- subset( data,
                                   grepl("^CON__",
-                                        `Protein IDs`,
+                                        protein.ids,
                                         perl = TRUE) == FALSE)
   
   # Clean them from the Protein IDs starting with REV__ regarding the Reverse sequences
   data.no.contaminants.no.reverse <- subset(data.no.contaminants,
                                             grepl("^REV__",
-                                                  `Protein IDs`,
+                                                  protein.ids,
                                                   perl = TRUE) == FALSE)
   
   return (data.no.contaminants.no.reverse)
 }
 
 use.peptides.median <- function (intensities,
+                                 do.norm = TRUE,
                                  minimum.detections = 2) {
   #
   # Get the median intensity of each peptide
   #
   # Args:
   #   intensities:        The list of the peptide's intensities between the technical replicates and fractions
+  #   do.norm:            Default is TRUE. Should TODO
   #   minimum.detections: Default is 2. The minimum number of detections to assume that the peptide was detected
   #
   # Returns:
@@ -232,12 +251,16 @@ use.peptides.median <- function (intensities,
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
   # Else  re return the median of the peptides intensity
-  if (length(intensities) < minimum.detections) {
+  if (length(intensities) < minimum.detections &
+      do.norm == TRUE) {
     return (list(NA))
   } else {
-    return (list(median(intensities)))  
+    if (length(intensities) == 0) {
+      return (list(0))
+    } else {
+      return (list(median(intensities)))
+    }
   }
-  
 }
 
 do.vsn.normalization <- function(filtered.data, conditions.to.compare,
@@ -268,10 +291,10 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
   data[, description:= gsub("F.*$","", description, perl = TRUE)]
   
   # Rename the "description" column to "Biological Replicate"
-  setnames(data, "description", "Biological Replicate")
+  setnames(data, "description", "biological.replicate")
   
   # Reorder the data.table
-  setkey(data, `Biological Replicate`,`Protein IDs`,`Unique Sequence ID` )
+  setkey(data, biological.replicate, protein.ids, unique.sequence.id)
   
   # Iterate over conditions
   for (condition in conditions.to.compare)  {
@@ -282,9 +305,10 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
     # replicates on the x axis
     wide.data <- dcast(data,
-                       `Protein IDs` + `Unique Sequence ID` ~ `Biological Replicate`,
+                       protein.ids + unique.sequence.id ~ biological.replicate,
                        value.var = condition,
-                       fun.aggregate = use.peptides.median)
+                       fun.aggregate = use.peptides.median,
+                       do.norm = do.norm)
     
     # Get only the part of the data.table with the intensities of the peptides
     vsn.matrix <- as.matrix(wide.data[, .SD, .SDcols = -c(1, 2)])
@@ -317,21 +341,22 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     } else {
       vsn.normalized.data <- merge(vsn.normalized.data,
                                    wide.data,
-                                   by=c("Protein IDs", "Unique Sequence ID"))
+                                   by=c("protein.ids", "unique.sequence.id"))
     }
   }
   
   return (vsn.normalized.data)
 }
 
-do.peptide.intensities.plots <- function(intensities.before.normalization, intensities.after.normalization,
+do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.data, analysis.name,
                                          plots.format = 5) {
   #
   # Makes 4 boxplot, before and after the normalization, with and without titles
   #
   # Args:
   #   intensities.before.normalization: The data.table of the non-normalized peptide intensities
-  #   intensities.after.normalization:  The data.table of the normalized peptide intensities
+  #   vsn.normalized.data:  The data.table of the normalized peptide intensities
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -341,12 +366,12 @@ do.peptide.intensities.plots <- function(intensities.before.normalization, inten
   #
   
   # Copy the data.tables
-  raw.data <- copy(intensities.before.normalization)
-  normalized.data <- copy(intensities.after.normalization)
+  raw.data <- copy(not.normalized.data)
+  normalized.data <- copy(vsn.normalized.data)
   
   # Remove the 'Protein IDs' columns
-  raw.data[, `Protein IDs`:= NULL]
-  normalized.data[, `Protein IDs`:= NULL]
+  raw.data[, protein.ids:= NULL]
+  normalized.data[, protein.ids:= NULL]
   
   # Melt the data.tables
   raw.data.melted <- melt(raw.data,
@@ -362,9 +387,14 @@ do.peptide.intensities.plots <- function(intensities.before.normalization, inten
   raw.data.melted[, variable := gsub(" ","\n", variable)]
   normalized.data.melted[, variable := gsub(" ","\n", variable)]
   
+  
   # Unlist the intensities column and for the non-normalized data log2 tranform them
   raw.data.melted[, value := log2(unlist(value))]
   normalized.data.melted[, value := unlist(value)]
+  
+  # For the raw data we may have Inf values for the 0 so in that case, we set the infs to NA
+  infs <- which(is.finite(raw.data.melted$value) == FALSE)
+  raw.data.melted$value[infs] <- NA 
   
   # Find the NAs
   raw.data.nas <- which(is.na(raw.data.melted$value) == TRUE)
@@ -453,8 +483,11 @@ do.peptide.intensities.plots <- function(intensities.before.normalization, inten
          title = "Peptide Intensities After Variance Stabilizing Normalization (VSN)") +
     scale_fill_manual(values = colorblind.palette)
   
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
   # Change to the limma directory
-  setwd(here("data-output/plots"))
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
@@ -573,7 +606,7 @@ do.peptides.aggregation <- function(imputed.data) {
   return (aggregated.data)
 }
 
-do.QQ.plots <- function(aggregated.data, conditions.to.compare,
+do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
                         plots.format = 5) {
   #
   # Produces 2 QQ plots, one with tile and one with no title
@@ -581,6 +614,7 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare,
   # Args:
   #   aggregated.data:        The aggregated.data data.table
   #   conditions.to.compare:  The condition for the descriptive plot
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -681,8 +715,11 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare,
                        name = "Conditions",
                        labels = conditions.to.compare)
   
-  # Change to the limma directory
-  setwd(here("data-output/plots"))
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
+  # Change to the plots directory
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
@@ -726,7 +763,7 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare,
   
 }
 
-do.fold.change.histogram <- function(limma.results, 
+do.fold.change.histogram <- function(limma.results, conditions.to.compare, analysis.name,
                                      plots.format = 5) {
   #
   # Produces 2 log fold change histograms, one with tile and one with no title
@@ -734,6 +771,7 @@ do.fold.change.histogram <- function(limma.results,
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -772,8 +810,11 @@ do.fold.change.histogram <- function(limma.results,
                                                              conditions.to.compare[[2]],
                                                              " histogram"))
   
-  # Change to the limma directory
-  setwd(here("data-output/plots"))
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
+  # Change to the plots directory
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
@@ -816,7 +857,7 @@ do.fold.change.histogram <- function(limma.results,
   
 }
 
-do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
+do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare, analysis.name,
                                         plots.format = 5) {
   #
   # Does 2 value ordered ratio plots, one with title and one with not.
@@ -824,6 +865,7 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -898,8 +940,11 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
     scale_color_manual(values = colorblind.palette,
                        name   = "Protein is Differentially Expressed")
   
-  # Change to the limma directory
-  setwd(here("data-output/plots"))
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
+  # Change to the plots directory
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
@@ -942,7 +987,7 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare,
   
 }
 
-do.MA.plots <- function(limma.results, conditions.to.compare,
+do.MA.plots <- function(limma.results, conditions.to.compare, analysis.name,
                         plots.format = 5) {
   #
   # Produces 2 MA plots, one with tile and one with no title
@@ -950,6 +995,7 @@ do.MA.plots <- function(limma.results, conditions.to.compare,
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -1001,8 +1047,11 @@ do.MA.plots <- function(limma.results, conditions.to.compare,
          title = "MA-plot") +
     scale_color_manual(values = colorblind.palette)
   
-  # Change to the limma directory
-  setwd(here("data-output/plots"))
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
+  # Change to the plots directory
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
@@ -1044,7 +1093,7 @@ do.MA.plots <- function(limma.results, conditions.to.compare,
   setwd(here("src"))
 }
 
-do.volcano.plots <- function(limma.results, conditions.to.compare,
+do.volcano.plots <- function(limma.results, conditions.to.compare, analysis.name,
                              plots.format = 5, error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05 ) {
   #
   # Generates and saves the 2 volcano plots in the appropriate format, one plain and one with descriptive info
@@ -1052,6 +1101,7 @@ do.volcano.plots <- function(limma.results, conditions.to.compare,
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
+  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -1150,8 +1200,11 @@ do.volcano.plots <- function(limma.results, conditions.to.compare,
          subtitle   = volcano.subtitle) +
     scale_color_manual(values = colorblind.palette)
   
-  # Change directory to the limma-output folder, inside the data-output folder
-  setwd(here("data-output/plots"))
+  # Create the plots path for each analysis
+  plots.path <- paste("data-output", analysis.name, "plots", sep = "/")
+  
+  # Change to the plots directory
+  setwd(here(plots.path))
   
   # Initialize the plot format
   plot.format <- ""
