@@ -59,99 +59,140 @@ make.data.output.folders <- function(analysis.name) {
   
 }
 
-make.Venn.diagram <- function(analysis.data, conditions.to.compare, analysis.title) {
+make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name,
+                              minimum.detections = 2, plots.format = 5) {
   #
   # Makes a Venn diagram between 2 conditions
   #
-  # Args:
-  #   analysis.data:          The data.table with the evidence data
+  # Args:p
+  #   evidence.data:          The data.table with the evidence data
   #   conditions.to.compare:  A vector with the 2 conditions to compare
-  #   analysis.title:         The analysis title provided by the user
+  #   analysis.name:         The analysis title provided by the user
+  #
+  #   minimum.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
+  #                           If it is measures less than N times, the peptide is considered as detected but not measures
+  #                           hence its value is set to NA
+  #
+  #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
+  #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
+  #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
   #
   # Returns:
   #   A venn diagram in png format and the data needed for its construction
   #
   
-  # Subset the evidence data keeping only the "Protein IDs", "Condition","biological replicate",
-  # "technical replicate", "fraction" columns
-  venn.table <- evidence.data[,
-                              .SD,
-                              .SDcols =  c("Protein IDs",
-                                           "Condition",
-                                           "biological replicate",
-                                           "technical replicate",
-                                           "fraction")]
+  # Get the evidence data
+  data <- copy(evidence.data)
   
-  # Order the subseted data.table
-  setkey(venn.table,  "Protein IDs",
-         "Condition",
-         "biological replicate",
-         "technical replicate",
-         "fraction")
+  # Remove the fraction information
+  data <- data[, description := gsub("F.*$","", description, perl = TRUE)]
   
-  # Set limma output path
-  data.output.path <- here("data-output")
+  # Make the condition pattern e.g. ".*.h$", ".*.wild$", ".*.mutant$" etc for each condition 
+  condition.A.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[1]),"$")
+  condition.B.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[2]),"$")
   
-  # Set limma output folder name
-  limma.folder <- "limma-output"
+  # Find those columns
+  condition.A.column <- grep(condition.A.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
+  condition.B.column <- grep(condition.B.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
   
-  # Prepare the limma output path
-  limma.output <- paste(data.output.path, limma.folder, sep = "/")
+  # Keep only the protein ids and the intensities
+  condition.A <- data[, .SD, .SDcols = c("protein.ids", condition.A.column)]
+  condition.B <- data[, .SD, .SDcols = c("protein.ids", condition.B.column)]
   
-  # Change directory to limma output
-  setwd(limma.output)
+  # Add a new column with the number that each proteins peptide is observed
+  occurences.A.column <- paste0("occurences.", tolower(conditions.to.compare[1]))
+  occurences.B.column <- paste0("occurences.", tolower(conditions.to.compare[2]))
   
-  # Count the occurences of each protein in each condition
-  venn.table <- venn.table[, .("Occurences"=.N), 
-                           by=c( "Protein IDs",
-                                 "Condition")]
+  # Now for each condition count the number on the non NA detections 
+  condition.A <- condition.A[, eval(occurences.A.column) := sum(!is.na(unlist(get(condition.A.column)))),
+                             by=c("protein.ids")]
   
-  # Order the data.table
-  setkey(venn.table, Condition)
+  condition.B <- condition.B[, eval(occurences.B.column) := sum(!is.na(unlist(get(condition.B.column)))),
+                             by=c("protein.ids")]
   
-  # Write the data in a TSV file
-  write.table(venn.table,
-              file = paste0(analysis.title, 
-                            "-venn-data.txt"),
-              sep="\t",
-              row.names = FALSE,
-              quote = FALSE)
+  # Then remove the intensities columns
+  condition.A <- condition.A[, eval(condition.A.column) := NULL]
+  condition.B <- condition.B[, eval(condition.B.column) := NULL]
   
-  # Now store the 2 conditions
-  conditions <- unique(venn.table[, Condition])
+  # Reduce the data.tables to keep only the rows with unique protein.ids
+  condition.A <- unique(condition.A, by=c("protein.ids"))
+  condition.B <- unique(condition.B, by=c("protein.ids"))
   
-  # Store in the variable the condition A
-  condition.1.table <- venn.table[conditions[1]]
+  # Find the rows below the peptide detection threshold
+  condition.A.peptides.below.threshold.rows <- which(condition.A[[occurences.A.column]] < minimum.detections)
+  condition.B.peptides.below.threshold.rows <- which(condition.B[[occurences.B.column]] < minimum.detections)
   
-  # Store in the variable the condition B
-  condition.2.table <- venn.table[conditions[2]]
+  # Remove those rows
+  condition.A <- condition.A[ -c(condition.A.peptides.below.threshold.rows), ]
+  condition.B <- condition.B[ -c(condition.B.peptides.below.threshold.rows), ]
   
-  # Take the Protein IDs and make the result a vector
-  condition.1.proteins <- unlist(condition.1.table[, "Protein IDs"])
-  condition.2.proteins <- unlist(condition.2.table[, "Protein IDs"])
+  # Now get the proteins for each conditions
+  condition.A.proteins <- unlist(condition.A$protein.ids) 
+  condition.B.proteins <- unlist(condition.B$protein.ids)
+  
+  # Find which vector has the maximum length
+  max.proteins <- max(length(condition.A.proteins),  length(condition.B.proteins))
+  
+  # So if the 2 vectors have different legnths, fill the shortest of the 2 with NAs
+  length(condition.A.proteins) <- max.proteins
+  length(condition.B.proteins) <- max.proteins
+  
+  # Put them in a matrix
+  venn.table <- cbind(condition.A.proteins, condition.B.proteins)
+  
+  # Correct ythe column names
+  colnames(venn.table) <- conditions.to.compare
+  
+  # Wrap them to a data.table
+  venn.table <- as.data.table(venn.table)
+  
+  # Save them in a csv
+  save.intermediate.data.tables(venn.table, "venn-data", analysis.name)
   
   # Make the set
-  sets <- list(condition.1.proteins, condition.2.proteins)
+  sets <- list(condition.A.proteins, condition.B.proteins)
   
   # Give the names of the conditions to the list's set
-  names(sets) <- conditions
+  names(sets) <- conditions.to.compare
   
   # By default the VennDiagram package makes a log file, that we want to supperss
   futile.logger::flog.threshold(futile.logger::ERROR, name = "VennDiagramLogger")
   
+  # Initialize the plot format
+  plot.format <- ""
+  
+  # In user has specified the he preffed different image format, change to the appropriate format
+  switch(plots.format,
+         plot.format <- "eps",
+         plot.format <- "ps",
+         plot.format <- "tex",
+         plot.format <- "pdf",
+         plot.format <- "jpeg",
+         plot.format <- "tiff",
+         plot.format <- "png",
+         plot.format <- "bmp",
+         plot.format <- "svg")
+  
+  # Prepare the plots path
+  plots.path <- paste("data-output", analysis.name, "plots",sep = "/")
+  
+  # Change to the plots path
+  setwd(here(plots.path))
+  
   # Now draw the venn diagram
   venn.diagram <- venn.diagram(sets,
-                               "test.venn.png",
-                               imagetype = "png",
+                               filename = paste("venn-diagram", plot.format, sep = "."),
+                               imagetype = plot.format,
                                main = paste0("Venn diagram between the conditions ",
-                                             conditions[1],
+                                             conditions.to.compare[1],
                                              " and ",
-                                             conditions[2],
-                                             "."),
-                               category = conditions,
+                                             conditions.to.compare[2]),
+                               category = conditions.to.compare,
                                scaled = FALSE,
                                alpha = c(0.7, 0.7),
-                               fill = c("blue", "red"),
+                               fontfamily = "Helvetica",
+                               main.fontface = "bold",
+                               fill = c("#999999", "#E69F00"),
                                cat.default.pos = "text",
                                cat.pos = c(1,1),
                                cex =  2,

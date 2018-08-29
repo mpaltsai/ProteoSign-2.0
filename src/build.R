@@ -196,6 +196,9 @@ analysis.data <- build.analysis.data(protein.groups.data = global.variables$prot
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
 
+# Store the data in a global variable
+global.variables[["evidence.data"]] <- analysis.data
+
 cat("after analysis data\n")
 
 # Now depending on the condition column type we will do different operations on the evidence.data
@@ -249,9 +252,6 @@ if (experiment.type == "Labeled Experiment") {
 
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
-
-# Remove useless data
-global.variables[["evidence.data"]] <- NULL
 
 global.variables[["protein.groups.data"]] <- NULL
 

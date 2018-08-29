@@ -1404,22 +1404,26 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
 
 zeros.to.nas <- function(evidence.data) {
   #
-  #
-  #
-  #
-  #
-  #
-  #
+  # Converts the zeros to NAs
+  # 
+  # Args:
+  #   evidence.data: The evidence.data.table
+  # 
+  # Returns:
+  #   The altered evidence data.tables
   #
   
+  # Get the evidence data.table
   data <- copy(evidence.data)
   
   # Find the Intensity column names
   intensity.columns <- grep("^intensity", colnames(data), perl = TRUE, value = TRUE)
   
+  # Find the zeros for each condition
   zeros.A <- which(data[, get(intensity.columns[1])] == 0)
   zeros.B <- which(data[, get(intensity.columns[2])] == 0)
   
+  # Convert the zeros to NAs
   data <- data[zeros.A, eval(intensity.columns[1]) := NA]
   data <- data[zeros.B, eval(intensity.columns[2]) := NA]
   

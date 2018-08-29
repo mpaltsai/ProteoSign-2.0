@@ -17,15 +17,20 @@ gc(verbose = FALSE,
 # Get the analysis name
 analysis.name <- global.variables$analysis.name
 
-# TODO do it a function
-# If it is bad, fix it 
+# If the analysis name is bad fix itis bad, fix it 
 analysis.name <- gsub("[[:space:]|[:punct:]]", "-", analysis.name)
 
 # Make the limma output folder
 make.data.output.folders(analysis.name)
 
-# 
-# make.Venn.diagram(evidence.data)
+# Get the evidence raw data
+evidence.data <- global.variables[["evidence.data"]]
+
+# Make tje Venn diagram
+make.Venn.diagram(evidence.data, conditions.to.compare, analysis.name)
+
+# And remove them from the global.variables
+global.variables[["evidence.data"]] <- NULL
 
 ### DATA IMPORT STEP ###
 
