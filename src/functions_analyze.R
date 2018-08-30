@@ -60,7 +60,7 @@ make.data.output.folders <- function(analysis.name) {
 }
 
 make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name,
-                              minimum.detections = 2, plots.format = 5) {
+                              minimum.peptide.detections = 2, plots.format = 5) {
   #
   # Makes a Venn diagram between 2 conditions
   #
@@ -69,7 +69,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   #   conditions.to.compare:  A vector with the 2 conditions to compare
   #   analysis.name:         The analysis title provided by the user
   #
-  #   minimum.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
+  #   minimum.peptide.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
   #                           If it is measures less than N times, the peptide is considered as detected but not measures
   #                           hence its value is set to NA
   #
@@ -119,8 +119,8 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   condition.B <- unique(condition.B, by=c("protein.ids"))
   
   # Find the rows below the peptide detection threshold
-  condition.A.peptides.below.threshold.rows <- which(condition.A[[occurences.A.column]] < minimum.detections)
-  condition.B.peptides.below.threshold.rows <- which(condition.B[[occurences.B.column]] < minimum.detections)
+  condition.A.peptides.below.threshold.rows <- which(condition.A[[occurences.A.column]] < minimum.peptide.detections)
+  condition.B.peptides.below.threshold.rows <- which(condition.B[[occurences.B.column]] < minimum.peptide.detections)
   
   # Remove those rows
   condition.A <- condition.A[ -c(condition.A.peptides.below.threshold.rows), ]
@@ -280,14 +280,14 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
 
 use.peptides.median <- function (intensities,
                                  do.norm = TRUE,
-                                 minimum.detections = 2) {
+                                 minimum.peptide.detections = 2) {
   #
   # Get the median intensity of each peptide
   #
   # Args:
   #   intensities:        The list of the peptide's intensities between the technical replicates and fractions
   #   do.norm:            Default is TRUE. Should TODO
-  #   minimum.detections: Default is 2. The minimum number of detections to assume that the peptide was detected
+  #   minimum.peptide.detections: Default is 2. The minimum number of detections to assume that the peptide was detected
   #
   # Returns:
   #   The median intensity of each peptide 
@@ -301,7 +301,7 @@ use.peptides.median <- function (intensities,
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
   # Else  re return the median of the peptides intensity
-  if (length(intensities) < minimum.detections &
+  if (length(intensities) < minimum.peptide.detections &
       do.norm == TRUE) {
     return (list(NA))
   } else {
@@ -314,14 +314,14 @@ use.peptides.median <- function (intensities,
 }
 
 do.vsn.normalization <- function(filtered.data, conditions.to.compare,
-                                 minimum.detections = 2, do.norm = TRUE) {
+                                 minimum.peptide.detections = 2, do.norm = TRUE) {
   #
   # Does variance stabilizing normalization (VSN) on the peptides intensities
   # 
   # Args:
   #   filtered.data:          The filtered data data.table
   #   conditions.to.compare:  The conditions to compare
-  #   minimum.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
+  #   minimum.peptide.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
   #                           If it is measures less than N times, the peptide is considered as detected but not measures
   #                           hence its value is set to NA
   #   do.norm:                Default is TRUE. Do the normalization or not? Only to use it for the plots before and 
@@ -642,13 +642,16 @@ do.peptides.aggregation <- function(imputed.data) {
   aggregated.data <- copy(imputed.data)
   
   # Do the aggregation of the peptides' intensity that belong to the same protein
-  aggregated.data <- aggregated.data[, lapply(.SD, sum), .SDcols=!"Unique Sequence ID", by="Protein IDs"]
+  aggregated.data <- aggregated.data[, lapply(.SD,
+                                              sum),
+                                     .SDcols=!"unique.sequence.id",
+                                     by="protein.ids"]
   
   # And rename the columns
   old.column.names <- colnames(aggregated.data)[-c(1)]
   
   # In order to  know that
-  new.column.names <- paste("Protein Abundance", old.column.names)
+  new.column.names <- paste("protein.abundance", old.column.names)
   
   # The columns now hold the protein abundances
   colnames(aggregated.data)[-c(1)] <- new.column.names
@@ -656,7 +659,7 @@ do.peptides.aggregation <- function(imputed.data) {
   return (aggregated.data)
 }
 
-do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
+do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name, experimental.metadata,
                         plots.format = 5) {
   #
   # Produces 2 QQ plots, one with tile and one with no title
@@ -664,7 +667,8 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
   # Args:
   #   aggregated.data:        The aggregated.data data.table
   #   conditions.to.compare:  The condition for the descriptive plot
-  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
+  #   analysis.name:          The name of the experiment e.g. "SILAC HUMAN"
+  #   experimental.metadata:  The metadata for each condition, number of biological/technical replicates
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -676,12 +680,17 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
   data <- copy(aggregated.data)
   
   # Remove the protein ids column
-  data[, "Protein IDs":= NULL]
+  data[, "protein.ids":= NULL]
   
   # Get the conditions' names
   condition.A <- conditions.to.compare[[1]]
   condition.B <- conditions.to.compare[[2]]
   
+  # In case of an Isotopic Experiment we have only one element in the list
+  if (names(experimental.metadata) == "Labeled Experiment") {
+    condition.A <- "Labeled Experiment"
+    condition.B <- "Labeled Experiment"
+  }
   
   # Get the number of biological replicates for each condition
   condition.A.number.of.biological <- experimental.metadata[[condition.A]]$number.of.biological.replicates
@@ -698,7 +707,7 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
   # Tag them
   condition.A.data <- cbind(condition.A.data, 1)
   
-  # Get the data for condition A
+  # Get the data for condition B
   condition.B.data <- as.double(as.matrix(data[, ((condition.A.number.of.biological * condition.A.number.of.technical) + 1): ncol(data)]))
   
   # Tag them
@@ -708,13 +717,13 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
   qq.plot.data <-  as.data.frame(rbind(condition.A.data, condition.B.data))  
   
   # Fix the column names
-  colnames(qq.plot.data) <- c("Abundancies", "Condition")
+  colnames(qq.plot.data) <- c("abundancies", "condition")
   
   # Make a QQ plot tha does not contain any title or description
   qq.plot.no.title <- ggplot(data       = qq.plot.data,
-                             aes(sample  = Abundancies,
-                                 group   = Condition,
-                                 color   = as.factor(Condition))) +
+                             aes(sample  = abundancies,
+                                 group   = condition,
+                                 color   = as.factor(condition))) +
     stat_qq(alpha  = 0.4,
             size   = 1.75) +
     stat_qq_line(alpha  = 0.4,
@@ -725,9 +734,9 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
           axis.title.y = element_text( family = "Helvetica",
                                        size   = 8)) +
     labs(x = "Theoretical Quantiles",
-         y = "Sample QUantiles") +
+         y = "Sample Quantiles") +
     scale_color_manual(values = colorblind.palette,
-                       name = "Conditions",
+                       name = "conditions",
                        labels = conditions.to.compare)
   
   # Now make a title for the descriptive QQ plot
@@ -735,16 +744,16 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
                            conditions.to.compare[[1]],
                            " and ",
                            conditions.to.compare[[2]],
-                           "protein abundancies")
+                           " protein abundancies")
   
   # In case that the description is longer than 70 characters, break the title into multiple lines
   qq.plot.title <- paste0(strwrap(qq.plot.title, 70), collapse = "\n")      
   
-  # Make a QQ plot tha contains title or description
+  # Make a QQ plot that contains title or description
   qq.plot.with.title <- ggplot(data       = qq.plot.data,
-                               aes(sample  = Abundancies,
-                                   group   = Condition,
-                                   color   = as.factor(Condition))) +
+                               aes(sample  = abundancies,
+                                   group   = condition,
+                                   color   = as.factor(condition))) +
     stat_qq(alpha  = 0.4,
             size   = 1.75) +
     stat_qq_line(alpha  = 0.4,
@@ -759,7 +768,7 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
           axis.title.y = element_text( family = "Helvetica",
                                        size   = 8)) +
     labs(x = "Theoretical Quantiles",
-         y = "Sample QUantiles",
+         y = "Sample Quantiles",
          title = qq.plot.title) +
     scale_color_manual(values = colorblind.palette,
                        name = "Conditions",
@@ -809,8 +818,6 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name,
   
   # Change back to the src directory
   setwd(here("src"))
-  
-  
 }
 
 do.fold.change.histogram <- function(limma.results, conditions.to.compare, analysis.name,
@@ -821,7 +828,7 @@ do.fold.change.histogram <- function(limma.results, conditions.to.compare, analy
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
-  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
+  #   analysis.name:          The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -915,7 +922,7 @@ do.value.ordered.ratio.plot <- function(limma.results, conditions.to.compare, an
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
-  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
+  #   analysis.name:          The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -1045,7 +1052,7 @@ do.MA.plots <- function(limma.results, conditions.to.compare, analysis.name,
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
-  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
+  #   analysis.name:          The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -1144,14 +1151,14 @@ do.MA.plots <- function(limma.results, conditions.to.compare, analysis.name,
 }
 
 do.volcano.plots <- function(limma.results, conditions.to.compare, analysis.name,
-                             plots.format = 5, error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05 ) {
+                             plots.format = 5, error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05) {
   #
   # Generates and saves the 2 volcano plots in the appropriate format, one plain and one with descriptive info
   #
   # Args:
   #   limma.results:          The data.frame with the limma results
   #   conditions.to.compare:  The condition for the descriptive plot
-  #   analysis.name:                    The name of the experiment e.g. "SILAC HUMAN"
+  #   analysis.name:          The name of the experiment e.g. "SILAC HUMAN"
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
   #                                                     "eps" "ps"  "tex" "pdf" "jpeg" "tiff" "png" "bmp" "svg"
@@ -1321,10 +1328,10 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   limma.data <- copy(aggregated.data)
   
   # Get the protein names
-  protein.ids <- limma.data[[1]]
+  protein.ids <- limma.data[, protein.ids]
   
   # And remove the protein names from the data.table
-  limma.data[[1]] <- NULL
+  limma.data[, protein.ids:= NULL]
   
   # Now convert the data.table to matrix
   limma.data <- as.matrix(limma.data)
@@ -1335,12 +1342,18 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   # Then get the colnames
   limma.column.names <- colnames(limma.data)
   
-  # Remove the protein abundance prefic and the technical replicate prefix
-  limma.column.names <- gsub("^(Protein Abundance )|(T[[:digit:]*]$)", "", limma.column.names, perl = TRUE)
+  # Remove the "protein.abundance." prefic and the technical replicate prefix
+  limma.column.names <- gsub("^(protein.abundance\\.)|(T[[:digit:]*]$)", "", limma.column.names, perl = TRUE)
   
   #  Get the condition names
   condition.A <- conditions.to.compare[[1]]
   condition.B <- conditions.to.compare[[2]]
+  
+  # In case of an Isotopic Experiment we have only one element in the list
+  if (names(experimental.metadata) == "Labeled Experiment") {
+    condition.A <- "Labeled Experiment"
+    condition.B <- "Labeled Experiment"
+  }
   
   # Get the number of biological replicates for each condition
   condition.A.number.of.biological <- experimental.metadata[[condition.A]]$number.of.biological.replicates
@@ -1410,11 +1423,9 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
          {
            stop("Invalid limma method for error correction.\n")
          })
-  
-  
   return (limma.results)
-  
 }
+
 # 
 # tmp.evalutate.correctness.t.test <- function(aggregated.data, proteins=c("PA3479", "PA5346", "PA0176", "PA4625", "PA4624", "PA3724", "PA3385", "PA5272", "PA3217", "PA3544", "PA5060")) {
 #   results <- lapply(proteins, function(proteinID) {

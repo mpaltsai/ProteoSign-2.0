@@ -1,3 +1,31 @@
+add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
+  
+  global.variables <- as.list(analysis.metadata[,2])
+  
+  names(global.variables) <- analysis.metadata[,1]
+  
+  boolean.variables <- c("replicate.multiplexing.is.used",
+                         "is.label.free",
+                         "is.isobaric")
+  
+  numeric.variables <- c("plots.format",
+                         "minimum.peptide.detections")
+  
+  double.varables <- c("fold.change.cut.off", "FDR")
+  
+  global.variables[boolean.variables] <- as.logical(global.variables[boolean.variables])
+  
+  global.variables[numeric.variables] <- as.numeric(global.variables[numeric.variables])
+  
+  global.variables[double.varables] <- as.double(global.variables[double.varables])
+  
+  # Split and unlist the conditions to compare
+  global.variables[["conditions.to.compare"]] <- unlist(strsplit(global.variables[["conditions.to.compare"]],
+                                                   split = ","))
+  return (global.variables)
+  
+}
+
 trim.and.lowercase.column.names <- function(old.column.names) {
   #
   # Trims the column names from dots and whitespaces and lowercases

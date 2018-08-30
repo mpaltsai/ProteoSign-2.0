@@ -23,9 +23,12 @@ experimental.structure <- global.variables[["experimental.structure"]]
 # Read the analysis arguments
 conditions.to.compare <- global.variables[["conditions.to.compare"]]
 is.label.free <- global.variables[["is.label.free"]]
+is.isobaric <- global.variables[["is.isobaric"]]
+dataset.origin <- global.variables[["dataset.origin"]]
 replicates.multiplexing <- global.variables[["replicate.multiplexing.is.used"]]
 evidence.data <- global.variables[["evidence.data"]]
 protein.groups.data <- global.variables[["protein.groups.data"]]
+
 
 # Order the experimental structure by raw.file name
 experimental.structure <- experimental.structure[order(experimental.structure$raw.file),]
@@ -184,14 +187,15 @@ global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
                                                            .SD[which.max(technical.replicate)],
                                                            by = biological.replicate]$technical.replicate)
 
+# Replace the 0s with NAs
 evidence.data <- zeros.to.nas(evidence.data)
 
 # Now build the analysis data 
-analysis.data <- build.analysis.data(protein.groups.data = global.variables$protein.groups.data,
+analysis.data <- build.analysis.data(protein.groups.data = protein.groups.data,
                                      evidence.data       = evidence.data,
-                                     data.origin         = global.variables$dataset.origin,
-                                     is.label.free       = global.variables$is.label.free,
-                                     is.isobaric         = global.variables$is.isobaric)
+                                     data.origin         = dataset.origin,
+                                     is.label.free       = is.label.free,
+                                     is.isobaric         = is.isobaric)
 
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data

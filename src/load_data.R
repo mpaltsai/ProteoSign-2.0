@@ -21,20 +21,8 @@ analysis.metadata <- read.csv(analysis.metadata.file,
                               stringsAsFactors = FALSE,
                               check.names = FALSE)
 
-# Make an empty global.variables list to store any global variable
-global.variables <- list()
-
 # Initialize the global variables with the analysis parameters
-global.variables[["analysis.name"]] <- analysis.metadata$analysis.name
-global.variables[["replicate.multiplexing.is.used"]] <- analysis.metadata$replicate.multiplexing.is.used
-global.variables[["dataset.origin"]] <- analysis.metadata$dataset.origin
-global.variables[["is.label.free"]]  <- analysis.metadata$is.label.free
-global.variables[["is.isobaric"]]    <- analysis.metadata$is.isobaric
-global.variables[["timestamp.to.keep"]] <- analysis.metadata$timestamp.to.keep
-global.variables[["culture.to.keep"]] <- analysis.metadata$culture.to.keep
-global.variables[["raw.files.to.remove"]] <- analysis.metadata$raw.files.to.remove
-global.variables[["raw.files.to.rename"]] <- analysis.metadata$raw.files.to.rename
-global.variables[["conditions.to.compare"]] <- unlist(strsplit(analysis.metadata$conditions.to.compare, split = ","))
+global.variables <- add.analysis.parameters.to.global.variables(analysis.metadata)
 
 # Get the dataset origin
 dataset.origin <- global.variables[["dataset.origin"]]
@@ -105,21 +93,36 @@ trimmed.and.lowercased.column.names <- trim.and.lowercase.column.names(evidence.
 # Set the trimmed and lowercase the evidence columns
 colnames(evidence.data) <- trimmed.and.lowercased.column.names
 
+# Get the evidence data column names
 evidence.data.column.names <- colnames(evidence.data)
+
 # The needed columns for the analysis depending on the software
 if (dataset.origin == "MaxQuant") {
   
   # Get the "intensity.X" columns where X stands for l, m, h respectivelly
-  intensity.columns <- grep("^intensity\\.", evidence.data.column.names,perl = TRUE, value = TRUE)
+  intensity.columns <- grep("^intensity\\.",
+                            evidence.data.column.names,
+                            perl = TRUE,
+                            value = TRUE)
   
-  # Get the conditions to compare
-  conditions.to.compare <- global.variables$conditions.to.compare
+  # Get the conditions to compare parameter value
+  conditions.to.compare <- global.variables[["conditions.to.compare"]]
   
-  # Make a pattern e.g "(h|m)$"
-  conditions.to.compare.pattern <- paste0("(", tolower(conditions.to.compare), ")$", collapse = "|")
+  # Lowercase them
+  conditions.to.compare <- tolower(conditions.to.compare)
+  
+  # Make a pattern e.g "\\.(h|m)$"
+  conditions.to.compare.pattern <- paste0("\\.(",
+                                          conditions.to.compare[1],
+                                          "|",
+                                          conditions.to.compare[2],
+                                          ")$")
   
   # And keep only the intensity columns I want to compare
-  intensity.columns <- grep(conditions.to.compare.pattern, intensity.columns, perl = TRUE, value = TRUE)
+  intensity.columns <- grep(conditions.to.compare.pattern,
+                            evidence.data.column.names,
+                            perl = TRUE,
+                            value = TRUE)
   
   evindence.columns.to.keep <- c("proteins",
                                  "raw.file",
@@ -133,7 +136,7 @@ if (dataset.origin == "MaxQuant") {
   
   # In any case, we take the intersection
   evindence.columns.subset <- intersect(evidence.data.column.names,
-                                             evindence.columns.to.keep)
+                                        evindence.columns.to.keep)
   
   # Now subset the columns to keep only the needed, in order to make
   # the data.table as light-weight as possible
