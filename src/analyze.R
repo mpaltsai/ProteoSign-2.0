@@ -15,7 +15,10 @@ gc(verbose = FALSE,
    reset = TRUE)
 
 # Get the analysis name
-analysis.name <- global.variables$analysis.name
+analysis.name <- global.variables[["analysis.name"]]
+
+# Get the conditions to compare vector from the global.variables list
+conditions.to.compare <- global.variables[["conditions.to.compare"]]
 
 # If the analysis name is bad fix itis bad, fix it 
 analysis.name <- gsub("[[:space:]|[:punct:]]", "-", analysis.name)
@@ -29,16 +32,13 @@ evidence.data <- global.variables[["evidence.data"]]
 # Make tje Venn diagram
 make.Venn.diagram(evidence.data, conditions.to.compare, analysis.name)
 
-# And remove them from the global.variables
-global.variables[["evidence.data"]] <- NULL
+# # And remove them from the global.variables
+# global.variables[["evidence.data"]] <- NULL
 
 ### DATA IMPORT STEP ###
 
 # Get the analysis data from the global.variables list
 analysis.data <- global.variables[["analysis.data"]]
-
-# Get the conditions to compare vector from the global.variables list
-conditions.to.compare <- global.variables[["conditions.to.compare"]]
 
 experimental.metadata <- global.variables[["experimental.metadata"]]
 

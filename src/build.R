@@ -253,7 +253,8 @@ if (experiment.type == "Labeled Experiment") {
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
 
-global.variables[["protein.groups.data"]] <- NULL
+# # Remove the protein groups data as it is not needed any more
+# global.variables[["protein.groups.data"]] <- NULL
 
 cat("========== End of build.R ==========\n")
 

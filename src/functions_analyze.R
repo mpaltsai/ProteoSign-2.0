@@ -181,8 +181,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   
   # Now draw the venn diagram
   venn.diagram <- venn.diagram(sets,
-                               filename = paste("venn-diagram", plot.format, sep = "."),
-                               imagetype = plot.format,
+                               filename = NULL,
                                main = paste0("Venn diagram between the conditions ",
                                              conditions.to.compare[1],
                                              " and ",
@@ -198,6 +197,16 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
                                cex =  2,
                                cat.cex = 2,
                                cat.dist = c(0.05, 0.05))
+  
+  # Save the boxplot after normalization with no description in high resolution 1920x1080 pixels, in the appropriate format
+  ggsave(filename = paste0("venn-diagram",".",plot.format),
+         plot = venn.diagram,
+         device = plot.format,
+         width = 6.4,
+         height = 3.6,
+         units = "in",
+         dpi = "print",
+         limitsize = FALSE)
   
   # And finally reset the working directory to the scripts folder
   setwd(here("src"))  
