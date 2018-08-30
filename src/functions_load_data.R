@@ -1,25 +1,40 @@
 add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
+  #
+  # Makes the global.variables list with all the needed variables that I want to
+  # be anytime reachable
+  #
+  # Args:
+  #   analysis.metadata: The analysis parameters, alongside with the values of 
+  #   each parameter
+  #
+  # Returns:
+  #   The global.variables list
+  #
   
+  # Turn the analysis parameters value vector to list
   global.variables <- as.list(analysis.metadata[,2])
   
+  # Add the names to the list
   names(global.variables) <- analysis.metadata[,1]
   
+  # Make a vector with the boolean variables
   boolean.variables <- c("replicate.multiplexing.is.used",
                          "is.label.free",
                          "is.isobaric")
   
+  # Make a vector with the numeric variables
   numeric.variables <- c("plots.format",
                          "minimum.peptide.detections")
   
+  # Make a vector with the double variables
   double.varables <- c("fold.change.cut.off", "FDR")
   
+  # Now turn them to their correct variable type
   global.variables[boolean.variables] <- as.logical(global.variables[boolean.variables])
-  
   global.variables[numeric.variables] <- as.numeric(global.variables[numeric.variables])
-  
   global.variables[double.varables] <- as.double(global.variables[double.varables])
   
-  # Split and unlist the conditions to compare
+  # And finally split and unlist the conditions to compare string
   global.variables[["conditions.to.compare"]] <- unlist(strsplit(global.variables[["conditions.to.compare"]],
                                                    split = ","))
   return (global.variables)
