@@ -59,7 +59,7 @@ make.data.output.folders <- function(analysis.name) {
   
 }
 
-make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name,
+make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name, is.label.free,
                               minimum.peptide.detections = 2, plots.format = 5) {
   #
   # Makes a Venn diagram between 2 conditions
@@ -67,11 +67,12 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   # Args:p
   #   evidence.data:          The data.table with the evidence data
   #   conditions.to.compare:  A vector with the 2 conditions to compare
-  #   analysis.name:         The analysis title provided by the user
+  #   analysis.name:          The analysis title provided by the user
+  #   is.label.free:          The experiment type, is it label-free or not        
   #
-  #   minimum.peptide.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
-  #                           If it is measures less than N times, the peptide is considered as detected but not measures
-  #                           hence its value is set to NA
+  #   minimum.peptide.detections: Default is 2. A strictness parameter regarding how many times is a peptide measured
+  #                               If it is measures less than N times, the peptide is considered as detected but not measures
+  #                               hence its value is set to NA
   #
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
@@ -84,20 +85,31 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   # Get the evidence data
   data <- copy(evidence.data)
   
-  # Remove the fraction information
-  data <- data[, description := gsub("F.*$","", description, perl = TRUE)]
-  
-  # Make the condition pattern e.g. ".*.h$", ".*.wild$", ".*.mutant$" etc for each condition 
-  condition.A.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[1]),"$")
-  condition.B.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[2]),"$")
-  
-  # Find those columns
-  condition.A.column <- grep(condition.A.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
-  condition.B.column <- grep(condition.B.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
+  if (is.label.free == TRUE) {
+    
+    # Remove the fraction information
+    data <- data[, description := gsub("F.*$","", description, perl = TRUE)]
+    
+    # Make the condition pattern e.g. ".*.h$", ".*.wild$", ".*.mutant$" etc for each condition 
+    condition.A.column <- conditions.to.compare[1]
+    condition.B.column <- conditions.to.compare[2]
+    
+    # Rename the column
+    setnames(data, "protein.ids", "proteins")
+    
+  } else {
+    # Make the condition pattern e.g. ".*.h$" etc for each condition 
+    condition.A.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[1]),"$")
+    condition.B.column.pattern <- paste0(".*\\.", tolower(conditions.to.compare[2]),"$")
+    
+    # Find those columns
+    condition.A.column <- grep(condition.A.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
+    condition.B.column <- grep(condition.B.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
+  }
   
   # Keep only the protein ids and the intensities
-  condition.A <- data[, .SD, .SDcols = c("protein.ids", condition.A.column)]
-  condition.B <- data[, .SD, .SDcols = c("protein.ids", condition.B.column)]
+  condition.A <- data[, .SD, .SDcols = c("proteins", condition.A.column)]
+  condition.B <- data[, .SD, .SDcols = c("proteins", condition.B.column)]
   
   # Add a new column with the number that each proteins peptide is observed
   occurences.A.column <- paste0("occurences.", tolower(conditions.to.compare[1]))
@@ -105,33 +117,34 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   
   # Now for each condition count the number on the non NA detections 
   condition.A <- condition.A[, eval(occurences.A.column) := sum(!is.na(unlist(get(condition.A.column)))),
-                             by=c("protein.ids")]
+                             by=c("proteins")]
   
   condition.B <- condition.B[, eval(occurences.B.column) := sum(!is.na(unlist(get(condition.B.column)))),
-                             by=c("protein.ids")]
+                             by=c("proteins")]
   
   # Then remove the intensities columns
   condition.A <- condition.A[, eval(condition.A.column) := NULL]
   condition.B <- condition.B[, eval(condition.B.column) := NULL]
   
   # Reduce the data.tables to keep only the rows with unique protein.ids
-  condition.A <- unique(condition.A, by=c("protein.ids"))
-  condition.B <- unique(condition.B, by=c("protein.ids"))
+  condition.A <- unique(condition.A, by = c("proteins"))
+  condition.B <- unique(condition.B, by = c("proteins"))
   
   # Find the rows below the peptide detection threshold
-  condition.A.peptides.below.threshold.rows <- which(condition.A[[occurences.A.column]] < minimum.peptide.detections)
-  condition.B.peptides.below.threshold.rows <- which(condition.B[[occurences.B.column]] < minimum.peptide.detections)
+  condition.A.peptides.below.threshold.rows <- which(condition.A[, get(occurences.A.column)] < minimum.peptide.detections)
+  condition.B.peptides.below.threshold.rows <- which(condition.B[, get(occurences.B.column)] < minimum.peptide.detections)
   
   # Remove those rows
   condition.A <- condition.A[ -c(condition.A.peptides.below.threshold.rows), ]
   condition.B <- condition.B[ -c(condition.B.peptides.below.threshold.rows), ]
   
   # Now get the proteins for each conditions
-  condition.A.proteins <- unlist(condition.A$protein.ids) 
-  condition.B.proteins <- unlist(condition.B$protein.ids)
+  condition.A.proteins <- unlist(condition.A$proteins) 
+  condition.B.proteins <- unlist(condition.B$proteins)
   
   # Find which vector has the maximum length
-  max.proteins <- max(length(condition.A.proteins),  length(condition.B.proteins))
+  max.proteins <- max(length(condition.A.proteins),
+                      length(condition.B.proteins))
   
   # So if the 2 vectors have different legnths, fill the shortest of the 2 with NAs
   length(condition.A.proteins) <- max.proteins
@@ -140,7 +153,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   # Put them in a matrix
   venn.table <- cbind(condition.A.proteins, condition.B.proteins)
   
-  # Correct ythe column names
+  # Correct the column names
   colnames(venn.table) <- conditions.to.compare
   
   # Wrap them to a data.table
@@ -148,6 +161,10 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   
   # Save them in a csv
   save.intermediate.data.tables(venn.table, "venn-data", analysis.name)
+  
+  # Remove the previously added NAs
+  condition.A.proteins <- condition.A.proteins[!is.na(condition.A.proteins)]
+  condition.B.proteins <- condition.B.proteins[!is.na(condition.B.proteins)]
   
   # Make the set
   sets <- list(condition.A.proteins, condition.B.proteins)
@@ -209,7 +226,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
          limitsize = FALSE)
   
   # And finally reset the working directory to the scripts folder
-  setwd(here("src"))  
+  setwd(here("src")) 
 }
 
 save.intermediate.data.tables <- function(data, file.name, analysis.name,
@@ -301,15 +318,10 @@ use.peptides.median <- function (intensities,
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
   # Else  re return the median of the peptides intensity
-  if (length(intensities) < minimum.peptide.detections &
-      do.norm == TRUE) {
+  if (length(intensities) < minimum.peptide.detections) {
     return (list(NA))
   } else {
-    if (length(intensities) == 0) {
-      return (list(0))
-    } else {
       return (list(median(intensities)))
-    }
   }
 }
 
@@ -687,7 +699,7 @@ do.QQ.plots <- function(aggregated.data, conditions.to.compare, analysis.name, e
   condition.B <- conditions.to.compare[[2]]
   
   # In case of an Isotopic Experiment we have only one element in the list
-  if (names(experimental.metadata) == "Labeled Experiment") {
+  if (length(names(experimental.metadata)) == 1) {
     condition.A <- "Labeled Experiment"
     condition.B <- "Labeled Experiment"
   }
@@ -1350,7 +1362,7 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   condition.B <- conditions.to.compare[[2]]
   
   # In case of an Isotopic Experiment we have only one element in the list
-  if (names(experimental.metadata) == "Labeled Experiment") {
+  if (length(names(experimental.metadata)) == 1) {
     condition.A <- "Labeled Experiment"
     condition.B <- "Labeled Experiment"
   }
@@ -1447,4 +1459,5 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
 #     results <- c(results, limma.results$is.diffenetially.expressed[id])
 #   }
 #   cat(length(proteins[results]), "proteins where significant:",proteins[results],"\n")
+# }
 # }

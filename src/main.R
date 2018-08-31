@@ -112,9 +112,9 @@ if (dir.exists("packrat") == FALSE &
 
 # Scripts to call
 files.to.load <- c( "initialize.R",
-                    "load_data.R")
-                    # "build.R",
-                    # "analyze.R")
+                    "load_data.R",
+                    "build.R",
+                    "analyze.R")
 
 # Set the currenct working directory
 setwd(here("src"))

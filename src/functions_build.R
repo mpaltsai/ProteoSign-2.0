@@ -658,9 +658,13 @@ correct.maxquant.files <- function(protein.groups.data, evidence.data) {
                                                .SDcols = c("protein.ids",
                                                             "protein.names",
                                                             "evidence.ids")]
+  
   # Break the each Evidence IDs cell in multiple by the ';' and merge them by their corresponding Protein ID and
   # Protein Name
-  protein.groups.subset.multiline.evidence <- cSplit(protein.groups.subset, "evidence.ids", ";", "long")
+  protein.groups.subset.multiline.evidence <- cSplit(protein.groups.subset,
+                                                     "evidence.ids",
+                                                     ";",
+                                                     "long")
   
  
   # Rename Evidence IDs column to ID in the multiple evidence table
@@ -1006,8 +1010,6 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
                   (is.label.free * 2) +
                   (is.isobaric * 3) + 1
   
-  
-  
   # If we are on an isotopic experiment, there is no need to add the condition column
   if (status.code == 1  | status.code == 2) {
     return (evidence.data.reformed)
@@ -1045,12 +1047,12 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               condition.raw.files.pattern <- paste(condition.raw.files, collapse = "|")
               
               # Find which rows should should have the corresponding condition 
-              indexes.of.condition <- grepl(condition.raw.files.pattern,
+              indexes.of.condition <- grep(condition.raw.files.pattern,
                                             evidence.data.reformed[, get(condition.column)],
                                             perl = TRUE)
               
               # Add the condition on these rows
-              evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
+              evidence.data.reformed <- evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
             },
             {
               # MaxQuant label-free
@@ -1068,7 +1070,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
                                             perl = TRUE)
               
               # Add the condition on these rows
-              evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
+              evidence.data.reformed <- evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
             },
             {
               cat("Incorrect case in add.compare.column.to.evidence...\n")
@@ -1077,15 +1079,14 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               # Proteome-Discoverer Isobaric
               
               # Add the condition on these rows
-              evidence.data.reformed[,condition := get(condition.column)]
+              evidence.data.reformed <- evidence.data.reformed[,condition := get(condition.column)]
               
             },
             {
-             
               # MaxQuant isobaric
               
               # Add the condition on these rows
-              evidence.data.reformed[, condition:=get(condition.column)] 
+              evidence.data.reformed <- evidence.data.reformed[, condition:=get(condition.column)] 
             })
   }
   
@@ -1118,20 +1119,20 @@ discard.useless.conditions.per.experiment <- function(evidence.data, conditions.
   # Now depending on the experimental setup remove the appropropriate rows
   switch(case.id,
          {
-            
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
+            # Isotopic Experiment  
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
             
          },
          {
             # Label-free Experiment
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
          },
          {
-           # Isobaric Labeled Experiment
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
-           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
+            # Isobaric Labeled Experiment
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
           })
   
   return (cleaned.evidence.data)
@@ -1193,13 +1194,13 @@ clear.user.condition.rows <- function(evidence.data, condition.to.remove, by.col
   return (clear.evidence.data)
 }
 
-bring.data.to.common.format <- function(evidence.data, data.origin, is.label.free, is.isobaric) {
+bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.free, is.isobaric) {
   #
   # Bring both evidence files from MaxQuant or Proteome-Discoverer to a common format for analysis
   #
   # Args:
   #   evidence.data:  The evidence.data data.table
-  #   data.origin:    Where the data come from, 'MaxQuant' or 'Proteome-Dsicoverer'
+  #   dataset.origin:    Where the data come from, 'MaxQuant' or 'Proteome-Dsicoverer'
   #   is.label.free:  TRUE or FALSE depending on the experiment
   #   is.isobaric:    TRUE or FALSE depending on the experiment
   #
@@ -1215,7 +1216,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
   
   # If data come from the MaxQuant  rename the 'Peptide ID' to 'Unique Sequence ID'
   # If data come form Proteome-Discoverer the column maybe already exists
-  if (data.origin == "MaxQuant") {
+  if (dataset.origin == "MaxQuant") {
     
     if ("peptide.id" %in% evidence.columns == TRUE) {
       setnames(evidence.data,"peptide.id", "unique.sequence.id")
@@ -1264,7 +1265,7 @@ bring.data.to.common.format <- function(evidence.data, data.origin, is.label.fre
   evidence.columns <- colnames(evidence.data)
   
   # Do the data come from MaxQuant?
-  origin.is.maxquant <- data.origin == "MaxQuant"
+  origin.is.maxquant <- dataset.origin == "MaxQuant"
   
   
   # 1:  Proteome-Discoverer Labeled
@@ -1419,18 +1420,36 @@ zeros.to.nas <- function(evidence.data) {
   # Find the Intensity column names
   intensity.columns <- grep("^intensity", colnames(data), perl = TRUE, value = TRUE)
   
-  # Find the zeros for each condition
-  zeros.A <- which(data[, get(intensity.columns[1])] == 0)
-  zeros.B <- which(data[, get(intensity.columns[2])] == 0)
-  
-  # Convert the zeros to NAs
-  data <- data[zeros.A, eval(intensity.columns[1]) := NA]
-  data <- data[zeros.B, eval(intensity.columns[2]) := NA]
+  # In case of a Labeled Experiment we expect 2 "intensity.X" columns
+  if (length(intensity.columns) == 2) {
+    
+    # Set the intensity columns to numeric
+    data <- data[, eval(intensity.columns[1]) := as.numeric(get(intensity.columns[1]))]
+    data <- data[, eval(intensity.columns[2]) := as.numeric(get(intensity.columns[2]))]
+    
+    # Find the zeros for each condition
+    zeros.A <- which(data[, get(intensity.columns[1])] == 0)
+    zeros.B <- which(data[, get(intensity.columns[2])] == 0)
+    
+    # Convert the zeros to NAs
+    data <- data[zeros.A, eval(intensity.columns[1]) := NA]
+    data <- data[zeros.B, eval(intensity.columns[2]) := NA]
+    
+  } else {
+    
+    data <- data[, eval(intensity.columns) := as.numeric(get(intensity.columns))]
+    
+    # Find the zeros in the intensity column
+    zeros <- which(data[, get(intensity.columns)] == 0)
+    
+    # Convert the zeros to NAs
+    data <- data[zeros, eval(intensity.columns) := NA]
+  }
   
   return (data)
 }
 
-build.analysis.data <- function(protein.groups.data, evidence.data, data.origin, is.isobaric, is.label.free) {
+build.analysis.data <- function(protein.groups.data, evidence.data, dataset.origin, is.isobaric, is.label.free) {
   #
   # Combines the information from "protein.groups.data" and the "evidence.data" tables in one matrix,
   # depending on the experimenta set up and transforms in in a common format
@@ -1439,7 +1458,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   #   protein.groups.data:  The proteinGroups.txt file from the MaxQuant or NULL if data comes from Proteome-Discoverer
   #   evidence.data:        The evidence.txt data.table for data coming from the MaxQuant
   #                         or the PSM file data.table for data coming from the Proteome Discoverer
-  #   data.origin:          String, "MaxQuant" or "Proteome-Discoverer" depending on the data source
+  #   dataset.origin:          String, "MaxQuant" or "Proteome-Discoverer" depending on the data source
   #   is.isobaric:          TRUE or FALSE depending on the experiment
   #   is.label.free:        TRUE or FALSE depending on the experiment
   #
@@ -1447,11 +1466,11 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   #   A tranformed data.table with only the needed column for the analysis
   #
   
-  # # TODO Remove test
-  # if (project.variables$development.stage == TRUE) {
+  # TODO Remove test
+  # if (TRUE) {
   #   protein.groups.data <- global.variables$protein.groups.data
   #   evidence.data <- global.variables$evidence.data
-  #   data.origin <- global.variables$dataset.origin
+  #   dataset.origin <- global.variables$dataset.origin
   #   is.label.free <- global.variables$is.label.free
   #   is.isobaric <- global.variables$is.isobaric
   # }
@@ -1463,7 +1482,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   evidence.column.names <- colnames(evidence.data)
   
   # Pick the right protein groups column depending on the data origin
-  if (data.origin == "Proteome-Discoverer") {
+  if (dataset.origin == "Proteome-Discoverer") {
     
     # Explicit handling for the Proteome Discoverer as there are differences between versions
     protein.groups.column <- find.proteome.discoverer.protein.column(evidence.data)
@@ -1480,9 +1499,11 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   # Reset evidence column names
   evidence.column.names <- colnames(evidence.data)
   
-  # If the data come from the MaxQuant correct the evidence and proteinGroups files
-  if (data.origin == "MaxQuant") {
-    corrected.files <- correct.maxquant.files(protein.groups.data, evidence.data)
+  # If the data come from the MaxQuant correct the evidence and
+  # proteinGroups files
+  if (dataset.origin == "MaxQuant") {
+    corrected.files <- correct.maxquant.files(protein.groups.data,
+                                              evidence.data)
     protein.groups.data <- corrected.files$protein.groups.data
     evidence.data <- corrected.files$evidence.data
   }
@@ -1499,7 +1520,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
     
     cat("We have an isobaric label file!\n")
     # Reform the evidence data table
-    evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, data.origin)
+    evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, dataset.origin)
     
     # Set the label.free flag to TRUE
     is.label.free <- TRUE
@@ -1508,7 +1529,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   # Reset evidence column names
   evidence.column.names <- colnames(evidence.data)
   
-  if (data.origin == "MaxQuant") {
+  if (dataset.origin == "MaxQuant") {
     protein.description.column <- "protein.names"
   } else {
     protein.description.column <- "protein.descriptions"
@@ -1524,7 +1545,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
   
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data),
-                                             data.origin,
+                                             dataset.origin,
                                              is.label.free,
                                              is.isobaric)
   
@@ -1533,7 +1554,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                     conditions.to.compare,
                                                     conditions.to.raw.files.list,
                                                     evidence.metadata,
-                                                    data.origin,
+                                                    dataset.origin,
                                                     is.label.free,
                                                     is.isobaric)
   
@@ -1543,16 +1564,25 @@ build.analysis.data <- function(protein.groups.data, evidence.data, data.origin,
                                                               is.label.free,
                                                               is.isobaric)
   
-  
-  evidence.data <- merge(evidence.data,
-                         global.variables$experimental.structure,
-                         by.x = c(evidence.metadata$raw.file),
-                         by.y = "raw.file")
-  
+  if (is.label.free == FALSE & is.isobaric == FALSE) {
+    
+    # In case of labeled experiment, merge by the "columns raw.file",
+    # "condition"
+    evidence.data <- merge(evidence.data,
+                           global.variables$experimental.structure,
+                           by = "raw.file")
+    
+  } else {
+    # In case of label-free experiment, merge by the "columns raw.file", "condition"
+    evidence.data <- merge(evidence.data,
+                           global.variables$experimental.structure,
+                           by = c("raw.file", "condition"))
+    
+  }
   
   # Finally prepare the evidence to have a common format across experimental setups
   evidence.data <- bring.data.to.common.format( evidence.data,
-                                                data.origin,
+                                                dataset.origin,
                                                 is.label.free,
                                                 is.isobaric)
   return (evidence.data) 

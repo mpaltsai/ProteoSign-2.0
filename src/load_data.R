@@ -34,7 +34,9 @@ if (dataset.origin == "MaxQuant") {
   cat("Data origin: Proteome Discoverer.\n")
 }
 
+# Get the experiment type
 is.label.free <- global.variables[["is.label.free"]]
+is.isobaric <- global.variables[["is.isobaric"]]
 
 # Path to the experimental structure file
 experimental.structrure.file <- paste(here(), "data-input/test-case", "experimental-structure.csv", sep = "/")
@@ -99,30 +101,34 @@ evidence.data.column.names <- colnames(evidence.data)
 # The needed columns for the analysis depending on the software
 if (dataset.origin == "MaxQuant") {
   
-  # Get the "intensity.X" columns where X stands for l, m, h respectivelly
-  intensity.columns <- grep("^intensity\\.",
+  intensity.columns <- grep("^intensity",
                             evidence.data.column.names,
                             perl = TRUE,
                             value = TRUE)
   
-  # Get the conditions to compare parameter value
-  conditions.to.compare <- global.variables[["conditions.to.compare"]]
+  if (is.label.free == FALSE &
+      is.isobaric == FALSE) {
+    # Get the conditions to compare parameter value
+    conditions.to.compare <- global.variables[["conditions.to.compare"]]
+    
+    # Lowercase them
+    conditions.to.compare <- tolower(conditions.to.compare)
+    
+    # Make a pattern e.g "\\.(h|m)$"
+    conditions.to.compare.pattern <- paste0("\\.(",
+                                            conditions.to.compare[1],
+                                            "|",
+                                            conditions.to.compare[2],
+                                            ")$")
+    
+    # Get the "intensity.X" columns where X stands for l, m, h respectivelly from the
+    # intensity columns
+    intensity.columns <- grep(conditions.to.compare.pattern,
+                              intensity.columns,
+                              perl = TRUE,
+                              value = TRUE)
+  }
   
-  # Lowercase them
-  conditions.to.compare <- tolower(conditions.to.compare)
-  
-  # Make a pattern e.g "\\.(h|m)$"
-  conditions.to.compare.pattern <- paste0("\\.(",
-                                          conditions.to.compare[1],
-                                          "|",
-                                          conditions.to.compare[2],
-                                          ")$")
-  
-  # And keep only the intensity columns I want to compare
-  intensity.columns <- grep(conditions.to.compare.pattern,
-                            evidence.data.column.names,
-                            perl = TRUE,
-                            value = TRUE)
   
   evindence.columns.to.keep <- c("proteins",
                                  "raw.file",
@@ -153,22 +159,27 @@ cat("Evidence file loaded!\n")
 
 # Get the timestamp and the culture to analyze
 timestamp.to.keep <- global.variables[["timestamp.to.keep"]]
-culture.to.keep <- global.variables[["culture.to.keep"]]
+subset.to.keep <- global.variables[["subset.to.keep"]]
 
-# Clean evidence file on specific timestamp or culture
-evidence.data <- keep.only.specific.timestamps.or.cultures(evidence.data,
-                                                           timestamp.to.keep,
-                                                           culture.to.keep)
+# If we have to select only a subset based on a timestamp or a culture
+if (timestamp.to.keep != "" | 
+    subset.to.keep != "") {
+
+  # Clean evidence file on specific timestamp or culture
+  evidence.data <- keep.only.specific.timestamps.or.cultures(evidence.data,
+                                                             timestamp.to.keep,
+                                                             subset.to.keep)
+}
 
 # If there ar raw file to be renamed, rename them
-if (is.na(global.variables[["raw.files.to.remove"]]) == FALSE & 
-    is.na(global.variables[["raw.files.to.rename"]]) == FALSE) {
-  
+if (global.variables[["raw.files.to.remove"]] != "" & 
+    global.variables[["raw.files.to.rename"]] != "") {
+
   raw.files.to.remove <- unlist(strsplit(global.variables[["raw.files.to.remove"]], split = ","))
   raw.files.to.rename <- unlist(strsplit(global.variables[["raw.files.to.rename"]], split = ","))
   
   evidence.data <- remove.and.rename.raw.files(evidence.data, raw.files.to.remove, raw.files.to.rename)
-  
+
 }
 
 # Add the evidence data to the global variables list
@@ -216,7 +227,8 @@ if (dataset.origin == "MaxQuant") {
   
   # Now subset the columns to keep only the needed, in order to make
   # the data.table as light-weight as possible
-  protein.groups.data <- protein.groups.data[, .SD, .SDcols = protein.groups.columns.subset]
+  protein.groups.data <- protein.groups.data[, .SD,
+                                             .SDcols = protein.groups.columns.subset]
   
   cat("ProteinGroups file loaded!\n")
   

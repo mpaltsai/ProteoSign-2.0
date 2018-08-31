@@ -20,6 +20,7 @@ minimum.peptide.detections <- global.variables[["minimum.peptide.detections"]]
 
 # Get the experiment metadata
 experimental.metadata <- global.variables[["experimental.metadata"]]
+is.label.free <- global.variables[["is.label.free"]]
 
 # Get the plots parameters
 analysis.name <- global.variables[["analysis.name"]]
@@ -43,7 +44,7 @@ make.data.output.folders(analysis.name)
 evidence.data <- global.variables[["evidence.data"]]
 
 # Make the Venn diagram
-make.Venn.diagram(evidence.data, conditions.to.compare, analysis.name,
+make.Venn.diagram(evidence.data, conditions.to.compare, analysis.name, is.label.free,
                   minimum.peptide.detections = minimum.peptide.detections,
                   plots.format = plots.format)
 

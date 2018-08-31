@@ -193,15 +193,12 @@ evidence.data <- zeros.to.nas(evidence.data)
 # Now build the analysis data 
 analysis.data <- build.analysis.data(protein.groups.data = protein.groups.data,
                                      evidence.data       = evidence.data,
-                                     data.origin         = dataset.origin,
+                                     dataset.origin      = dataset.origin,
                                      is.label.free       = is.label.free,
                                      is.isobaric         = is.isobaric)
 
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
-
-# Store the data in a global variable
-global.variables[["evidence.data"]] <- analysis.data
 
 cat("after analysis data\n")
 
@@ -209,7 +206,10 @@ cat("after analysis data\n")
 experiment.type <- unique(analysis.data$condition)
 
 # If we are on an Isotopic Experiment
-if (experiment.type == "Labeled Experiment") {
+if (length(experiment.type) == 1) {
+  
+  # Keep the evidence for the venn diagram
+  global.variables[["evidence.data"]] <- copy(evidence.data)
   
   # Find the Intensity column names
   intensity.columns <- grep("^intensity", colnames(analysis.data), perl = TRUE, value = TRUE)
@@ -225,7 +225,7 @@ if (experiment.type == "Labeled Experiment") {
   analysis.data <- analysis.data[-c(na.rows), ]
   
   # Discard the condition columns as now there is no need for it
-  analysis.data <- analysis.data[, condition:=NULL]
+  analysis.data <- analysis.data[, condition := NULL]
   
   # Find the position of the intensity columns
   intensity.columns.position <- grep("^intensity", colnames(analysis.data), perl = TRUE)
@@ -240,6 +240,7 @@ if (experiment.type == "Labeled Experiment") {
   colnames(analysis.data)[intensity.columns.position] <- intensity.columns
   
 } else {
+  
   # Cast the multiline conditions to 2 columns Condition1 Condition2 with their peptides' intensities
   analysis.data <- dcast.data.table(analysis.data[, 
                                                   by=.( description,
@@ -249,6 +250,11 @@ if (experiment.type == "Labeled Experiment") {
                                     description + protein.ids + unique.sequence.id ~ condition,
                                     value.var = "intensities",
                                     fill = NA)
+  
+  # Remove NA proteins
+  analysis.data <- na.omit(analysis.data, cols = "protein.ids")
+  
+  global.variables[["evidence.data"]] <- copy(analysis.data)
   
   # Keep only the peptides that were present in both conditions
   analysis.data <- na.omit(analysis.data, cols = conditions.to.compare) 

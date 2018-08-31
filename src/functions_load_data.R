@@ -35,8 +35,12 @@ add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
   global.variables[double.varables] <- as.double(global.variables[double.varables])
   
   # And finally split and unlist the conditions to compare string
-  global.variables[["conditions.to.compare"]] <- unlist(strsplit(global.variables[["conditions.to.compare"]],
-                                                   split = ","))
+  conditions.to.compare <- unlist(strsplit(global.variables[["conditions.to.compare"]],
+                                           split = ","))
+  
+  # Trim them in case of whitespaces
+  global.variables[["conditions.to.compare"]] <- trimws(conditions.to.compare)
+  
   return (global.variables)
   
 }
@@ -66,7 +70,7 @@ trim.and.lowercase.column.names <- function(old.column.names) {
 }
 
 keep.only.specific.timestamps.or.cultures <- function(evidence.data, 
-                                                      timestamp.to.keep = NA, subset.to.keep = NA) {
+                                                      timestamp.to.keep = "", subset.to.keep = "") {
   #
   # Does filtering of the raw file column based on the wanted timestamp or subset
   #
@@ -83,33 +87,35 @@ keep.only.specific.timestamps.or.cultures <- function(evidence.data,
   data.to.clean <- copy(evidence.data)
   
   # Keep only wanted timestamp
-  if (is.na(timestamp.to.keep) == FALSE) {
+  if (timestamp.to.keep != "") {
     # Make the pattern of the timestamp to keep
-    timestamp.to.keep.pattern <- paste0(timestamp.to.keep, ".*")
+    timestamp.to.keep.pattern <- paste0(".*", timestamp.to.keep, ".*")
     
     # Find the pattern
-    timestamps.to.clean <- grep(timestamp.to.keep.pattern,
+    timestamp.to.keep.positions <- grep(timestamp.to.keep.pattern,
                                 data.to.clean$raw.file,
                                 perl = TRUE)
     
     # And keep only these rows for the specific pattern
-    data.cleaned <- data.to.clean[timestamps.to.clean,]
+    data.to.clean <- data.to.clean[timestamp.to.keep.positions,]
   }
-  
   
   # Keep only the wanted subset of the proteome
-  if (is.na(subset.to.keep) == FALSE) {
+  if (subset.to.keep != "") {
     # Make the pattern of the timestamp to keep
-    subset.to.keep.pattern <- paste0(subset.to.keep, ".*")
+    subset.to.keep.pattern <- paste0(".*", subset.to.keep, ".*")
     
     # Find the pattern
-    subset.to.clean <- grep(subset.to.keep.pattern,
+    subset.to.keep.positions <- grep(subset.to.keep.pattern,
                                 data.to.clean$raw.file,
                                 perl = TRUE)
     
     # And keep only these rows for the specific pattern
-    data.cleaned <- data.to.clean[subset.to.clean,]
+    data.to.clean <- data.to.clean[subset.to.keep.positions,]
   }
+  
+  # Now our data are cleaned
+  data.cleaned <- data.to.clean
   
   return (data.cleaned)
 }
@@ -136,7 +142,8 @@ remove.and.rename.raw.files <- function(evidence.data, raw.files.to.remove, raw.
   
   # If the length of the input vectors is different, stop the execution
   # of the analysis
-  if (length(raw.files.to.remove) != length(raw.files.to.rename)) {
+  if (length(raw.files.to.remove) != length(raw.files.to.rename) |
+      raw.files.to.remove == "") {
     stop("Invalid raw.files.to.remove, raw.files.to.rename lengths. The 2 vectors should have the same length.\n")
   }
   
