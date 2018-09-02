@@ -1467,13 +1467,13 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   #
   
   # TODO Remove test
-  # if (TRUE) {
-  #   protein.groups.data <- global.variables$protein.groups.data
-  #   evidence.data <- global.variables$evidence.data
-  #   dataset.origin <- global.variables$dataset.origin
-  #   is.label.free <- global.variables$is.label.free
-  #   is.isobaric <- global.variables$is.isobaric
-  # }
+  if (TRUE) {
+    protein.groups.data <- global.variables$protein.groups.data
+    evidence.data <- global.variables$evidence.data
+    dataset.origin <- global.variables$dataset.origin
+    is.label.free <- global.variables$is.label.free
+    is.isobaric <- global.variables$is.isobaric
+  }
   
   # Initialize the protein groups column
   protein.groups.column <- ""

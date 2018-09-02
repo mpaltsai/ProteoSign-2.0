@@ -377,7 +377,7 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     
     # Do the normalization and suppress the warnings regardind the NA removal the the vsn package throws by default
     if (do.norm == TRUE) {
-     suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix,verbose = FALSE))
+      suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix,verbose = FALSE))
     } else {
       vsn.matrix.normalized <- vsn.matrix
     }
@@ -1317,7 +1317,7 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, analysis.name
 }
 
 do.limma.analysis <- function(aggregated.data, conditions.to.compare, experimental.metadata,
-                              error.correction.method = "B", fold.change.cut.off = 1.5, FDR = 0.05) {
+                              error.correction.method = "BH", fold.change.cut.off = 1.5, FDR = 0.05) {
   #
   # Does the limma analysis and returns a dataframe with the results of limme
   #
@@ -1327,7 +1327,7 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   #   experimental.metadata:    The metadata list of the experiment (condition >  number of biological replicates/
   #                                                                               number of technical replicates/
   #                                                                               number of fractions)
-  #   error.correction.method:  Default is "B". Corrects the Type 1 errors using the Bonferroni correction method or
+  #   error.correction.method:  Default is "BH". Corrects the Type 1 errors using the Bonferroni correction method or
   #                             the Benjamini-Hochberg method. Values can be "B" or "BH'
   #   fold.change.cut.off:      Default is 1.5. The least fold change  in order to consider a protein differentially expressed
   #   FDR:                      Default is 0.05. The least fold change  in order to consider a protein differentially expressed
@@ -1355,11 +1355,16 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   limma.column.names <- colnames(limma.data)
   
   # Remove the "protein.abundance." prefic and the technical replicate prefix
-  limma.column.names <- gsub("^(protein.abundance\\.)|(T[[:digit:]*]$)", "", limma.column.names, perl = TRUE)
+  limma.column.names <- gsub("^(protein.abundance )|(T[[:digit:]*]$)", "",
+                             limma.column.names,
+                             perl = TRUE)
+  
+  # Reset the column names
+  colnames(limma.data) <- limma.column.names
   
   #  Get the condition names
-  condition.A <- conditions.to.compare[[1]]
-  condition.B <- conditions.to.compare[[2]]
+  condition.A <- conditions.to.compare[1]
+  condition.B <- conditions.to.compare[2]
   
   # In case of an Isotopic Experiment we have only one element in the list
   if (length(names(experimental.metadata)) == 1) {
@@ -1376,42 +1381,67 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   condition.B.number.of.technical <- experimental.metadata[[condition.B]]$number.of.technical.replicates
   
   # Construct the design matrix
-  design <- cbind(Intercept = 1, condition.B = c( rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
-                                                  rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical)))
+  design <- cbind(c(rep.int(1, condition.A.number.of.biological * condition.A.number.of.technical),
+                                        rep.int(0, condition.B.number.of.biological * condition.B.number.of.technical)),
+                  c(rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
+                                        rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical)))
+  
+  #  Get the condition names
+  condition.A <- conditions.to.compare[1]
+  condition.B <- conditions.to.compare[2]
+  
+  # Add colnames to the design matrix
+  colnames(design) <- c(condition.A, condition.B)
   
   # In we also have technical replicates, add the appropriate column to the design
-  if (condition.A.number.of.technical != 1 &  condition.B.number.of.technical != 1) {
-    design <- cbind(design, technical.replicate = c(rep.int(1:condition.A.number.of.technical, condition.A.number.of.biological),
-                                                  rep.int(1:condition.B.number.of.technical, condition.B.number.of.biological)))
-    
+  if (condition.A.number.of.technical != 1 &
+      condition.B.number.of.technical != 1) {
+    # design <- cbind(design, technical.replicate = c(rep.int(0:1, condition.A.number.of.biological),
+    #                                               rep.int(0:1, condition.B.number.of.biological)))
+
     # Prepare the limma block matrix
-    limma.block <- rep(1:(condition.A.number.of.biological + condition.B.number.of.biological), 
-                       c(rep.int(condition.A.number.of.technical, condition.A.number.of.biological),
-                         rep.int(condition.B.number.of.technical, condition.B.number.of.biological)))
+    limma.block <- c(rep(1:condition.A.number.of.biological,
+                         c( rep.int(condition.A.number.of.technical,
+                                    condition.A.number.of.biological))),
+                     rep(1:condition.B.number.of.biological,
+                         c( rep.int(condition.B.number.of.technical,
+                                    condition.B.number.of.biological))))
     
     # Calculate the correlation between the technical replicates
-    duplicate.correlation <- duplicateCorrelation(limma.data, design, block = limma.block)
+    duplicate.correlation <- duplicateCorrelation(limma.data,
+                                                  design,
+                                                  block = limma.block)
     
     # Get the correlation
     duplicate.correlation.consensus <- duplicate.correlation$consensus.correlation
     
     # Do the linear modelling taking into account the technical replicates and their correlation
-    limma.fit <- lmFit(limma.data, design, block = limma.block, correlation = duplicate.correlation.consensus)
+    limma.fit <- lmFit(limma.data,
+                       design,
+                       block = limma.block,
+                       correlation = duplicate.correlation.consensus)
+  
   } else {
     
     # Do the linear modelling in the case we do not have technical replicates
     limma.fit <- lmFit(limma.data, design)
   }
   
-  # contrasts <- makeContrasts(Intercept-condition.B, levels=design)
+  contrast.matrix <- makeContrasts(paste0(condition.A, "-", condition.B), levels = design)
   
-  # limma.fit <- contrasts.fit(limma.fit, contrasts)
+  limma.fit.contrast <- contrasts.fit(limma.fit, contrast.matrix)
   
   # And calculates the statistics
-  limma.fit <- treat(limma.fit, lfc = log2(fold.change.cut.off), trend = TRUE, robust = TRUE)
-  
+  limma.fit.treat <- treat(limma.fit.contrast,
+                             lfc = log2(fold.change.cut.off),
+                             trend = TRUE,
+                             robust = TRUE)
+
   # Make a data.frame with the statistics for each protein, sorted by p-value, either it is significant or not
-  limma.results <- topTable(limma.fit, coef = 2, sort.by="P", n=Inf)
+  limma.results <- topTreat(limma.fit.treat,
+                            adjust.method = error.correction.method,
+                            sort.by = "P",
+                            n = Inf)
   
   # And a column with the protein names
   limma.results <- cbind(Protein=rownames(limma.results), limma.results)
@@ -1420,21 +1450,9 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   rownames(limma.results) <- 1:nrow(limma.results)
   
   # Depending on the the results conservativeness, use the appropriate method
-  switch(error.correction.method,
-         "B" =  {
-           limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
-                                                        limma.results$P.Value  < (0.05/length(protein.ids))
-           
-           limma.results$adj.P.Val <- limma.results$P.Value /length(protein.ids)
-           
-         },
-         "BH" = {
-           limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
-                                                        limma.results$adj.P.Val  < FDR
-         },
-         {
-           stop("Invalid limma method for error correction.\n")
-         })
+  limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                              limma.results$adj.P.Val  < FDR
+
   return (limma.results)
 }
 
