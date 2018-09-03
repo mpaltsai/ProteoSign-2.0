@@ -209,7 +209,7 @@ experiment.type <- unique(analysis.data$condition)
 if (length(experiment.type) == 1) {
   
   # Keep the evidence for the venn diagram
-  global.variables[["evidence.data"]] <- copy(evidence.data)
+  global.variables[["evidence.data"]] <- copy(analysis.data)
   
   # Find the Intensity column names
   intensity.columns <- grep("^intensity", colnames(analysis.data), perl = TRUE, value = TRUE)

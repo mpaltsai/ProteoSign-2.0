@@ -1,18 +1,18 @@
 # Here does all the analysis steps. Results are reported in xlsx/csv media format
 # in the designated folders.
 
-# Clear enviroment and only keep functions and global/project variables
-rm(list = grep(paste(c("^global.variables",
-                       "^project.variables",
-                       lsf.str()),
-                     collapse = "|"),
-               ls(),
-               value = TRUE,
-               invert = TRUE))
-
-# Return the memory to the OS
-gc(verbose = FALSE,
-   reset = TRUE)
+# # Clear enviroment and only keep functions and global/project variables
+# rm(list = grep(paste(c("^global.variables",
+#                        "^project.variables",
+#                        lsf.str()),
+#                      collapse = "|"),
+#                ls(),
+#                value = TRUE,
+#                invert = TRUE))
+# 
+# # Return the memory to the OS
+# gc(verbose = FALSE,
+#    reset = TRUE)
 
 ### Get the analysis data from the global.variables list
 analysis.data <- global.variables[["analysis.data"]]
@@ -88,7 +88,7 @@ save.intermediate.data.tables(vsn.normalized.data,
 
 ### IMPUTATION ###
 
-imputed.data <- do.LCMD.imputation(vsn.normalized.data)
+imputed.data <- do.knn.imputation(vsn.normalized.data, max.na.percentance.per.row = 60)
 
 # Save the data.table to the intermediate-data
 save.intermediate.data.tables(imputed.data,

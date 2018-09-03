@@ -85,10 +85,10 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   # Get the evidence data
   data <- copy(evidence.data)
   
+  # Remove the fraction information
+  data <- data[, description := gsub("F.*$","", description, perl = TRUE)]
+  
   if (is.label.free == TRUE) {
-    
-    # Remove the fraction information
-    data <- data[, description := gsub("F.*$","", description, perl = TRUE)]
     
     # Make the condition pattern e.g. ".*.h$", ".*.wild$", ".*.mutant$" etc for each condition 
     condition.A.column <- conditions.to.compare[1]
@@ -105,42 +105,68 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
     # Find those columns
     condition.A.column <- grep(condition.A.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
     condition.B.column <- grep(condition.B.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
+    
+    # Keep all the columns except the opposite condition
+    condition.A <- data[, .SD, .SDcols = !c(condition.B.column, "condition")]
+    condition.B <- data[, .SD, .SDcols = !c(condition.A.column, "condition")]
   }
   
-  # Keep only the protein ids and the intensities
-  condition.A <- data[, .SD, .SDcols = c("proteins", condition.A.column)]
-  condition.B <- data[, .SD, .SDcols = c("proteins", condition.B.column)]
+  # Filter out contaminants
+  condition.A <- filter.out.reverse.and.contaminants(condition.A)
+  condition.B <- filter.out.reverse.and.contaminants(condition.B)
   
-  # Add a new column with the number that each proteins peptide is observed
-  occurences.A.column <- paste0("occurences.", tolower(conditions.to.compare[1]))
-  occurences.B.column <- paste0("occurences.", tolower(conditions.to.compare[2]))
+  # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
+  # replicates on the x axis
+  condition.A <- dcast(condition.A,
+                     protein.ids + unique.sequence.id ~ description,
+                     value.var = condition.A.column,
+                     fun.aggregate = use.peptides.median)
   
-  # Now for each condition count the number on the non NA detections 
-  condition.A <- condition.A[, eval(occurences.A.column) := sum(!is.na(unlist(get(condition.A.column)))),
-                             by=c("proteins")]
+  condition.B <- dcast(condition.B,
+                       protein.ids + unique.sequence.id ~ description,
+                       value.var = condition.B.column,
+                       fun.aggregate = use.peptides.median)
   
-  condition.B <- condition.B[, eval(occurences.B.column) := sum(!is.na(unlist(get(condition.B.column)))),
-                             by=c("proteins")]
+  # Get the number of columns on each condition
+  samples.column.number.A <- ncol(condition.A)
+  samples.column.number.B <- ncol(condition.B)
+  
+  # Now for each row compute the NA percentance
+  condition.A[, na.percentance := ((samples.column.number.A - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number.A,
+               .SDcols = c(3:samples.column.number.A)]
+  
+  condition.B[, na.percentance := ((samples.column.number.B - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number.B,
+              .SDcols = c(3:samples.column.number.B)]
+  
+  # Then find the rows with correct observations
+  rows.with.good.observations.A <- which(condition.A$na.percentance > max.na.percentance.per.row)
+  rows.with.good.observations.B <- which(condition.B$na.percentance > max.na.percentance.per.row)
+  
+  # Keep only them
+  condition.A <- condition.A[rows.with.good.observations.A, ]
+  condition.B <- condition.B[rows.with.good.observations.B, ]
+  
+  # Remove the useless na.percentance column
+  condition.A[, na.percentance := NULL]
+  condition.B[, na.percentance := NULL]
   
   # Then remove the intensities columns
-  condition.A <- condition.A[, eval(condition.A.column) := NULL]
-  condition.B <- condition.B[, eval(condition.B.column) := NULL]
+  condition.A[, number.of.peptides := .N, by = "protein.ids"]
+  condition.B[, number.of.peptides := .N, by = "protein.ids"]
   
-  # Reduce the data.tables to keep only the rows with unique protein.ids
-  condition.A <- unique(condition.A, by = c("proteins"))
-  condition.B <- unique(condition.B, by = c("proteins"))
+  # Find the peptides with at least 1 intensity
+  peptides.above.threshold.A <- which(condition.A$number.of.peptides >= minimum.peptide.detections)
+  peptides.above.threshold.B <- which(condition.B$number.of.peptides >= minimum.peptide.detections)
   
-  # Find the rows below the peptide detection threshold
-  condition.A.peptides.below.threshold.rows <- which(condition.A[, get(occurences.A.column)] < minimum.peptide.detections)
-  condition.B.peptides.below.threshold.rows <- which(condition.B[, get(occurences.B.column)] < minimum.peptide.detections)
+  # Keep the ones with at least 1 intensity
+  condition.A <- condition.A[peptides.above.threshold.A,]
+  condition.B <- condition.B[peptides.above.threshold.B,]
   
-  # Remove those rows
-  condition.A <- condition.A[ -c(condition.A.peptides.below.threshold.rows), ]
-  condition.B <- condition.B[ -c(condition.B.peptides.below.threshold.rows), ]
+  # Get the protein names on this sample
+  condition.A.proteins <- unique(condition.A$protein.ids)
+  condition.B.proteins <- unique(condition.B$protein.ids)
   
-  # Now get the proteins for each conditions
-  condition.A.proteins <- unlist(condition.A$proteins) 
-  condition.B.proteins <- unlist(condition.B$proteins)
+  # TODO
   
   # Find which vector has the maximum length
   max.proteins <- max(length(condition.A.proteins),
@@ -296,15 +322,13 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
 }
 
 use.peptides.median <- function (intensities,
-                                 do.norm = TRUE,
-                                 minimum.peptide.detections = 2) {
+                                 do.norm = TRUE) {
   #
   # Get the median intensity of each peptide
   #
   # Args:
   #   intensities:        The list of the peptide's intensities between the technical replicates and fractions
   #   do.norm:            Default is TRUE. Should TODO
-  #   minimum.peptide.detections: Default is 2. The minimum number of detections to assume that the peptide was detected
   #
   # Returns:
   #   The median intensity of each peptide 
@@ -318,7 +342,7 @@ use.peptides.median <- function (intensities,
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
   # Else  re return the median of the peptides intensity
-  if (length(intensities) < minimum.peptide.detections) {
+  if (length(intensities) == 0) {
     return (list(NA))
   } else {
       return (list(median(intensities)))
@@ -611,7 +635,8 @@ do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.dat
   setwd(here("src"))
 }
 
-do.LCMD.imputation <- function(vsn.normalized.data) {
+do.knn.imputation <- function(vsn.normalized.data,
+                              k.neighbours = 10, max.na.percentance.per.row = 50.0) {
   #
   # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
   #
@@ -625,11 +650,31 @@ do.LCMD.imputation <- function(vsn.normalized.data) {
   # Copy the initial normalized data
   imputed.data <- copy(vsn.normalized.data)
   
-  # Make a matrix with only the intensities
-  data.to.impute <- as.matrix(vsn.normalized.data[, -c(1,2)])
+  # Get the column number 
+  samples.column.number <- ncol(imputed.data)
   
-  # Do the imputation
-  imputed.matrix <- impute.QRILC(data.to.impute)[[1]]
+  # Now for each row compute the NA percentance
+  imputed.data[, na.percentance := ((samples.column.number - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number,
+               .SDcols = c(3:samples.column.number)]
+  
+  # Then find the rows with correct observations
+  rows.with.good.observations <- which(imputed.data$na.percentance > max.na.percentance.per.row)
+  
+  # Keep only them
+  imputed.data <- imputed.data[rows.with.good.observations, ]
+  
+  # Remove the useless na.percentance column
+  imputed.data <- imputed.data[, na.percentance := NULL]
+  
+  # Make a matrix with only the intensities
+  data.to.impute <- as.matrix(imputed.data[, -c(1,2)])
+  
+  # Do the kNN imputation
+  knn.imputation.results <- impute.knn(data.to.impute,
+                                       k = k.neighbours, rowmax = max.na.percentance.per.row)
+  
+  # Get the new matrix
+  imputed.matrix <- knn.imputation.results$data
   
   # And update the initial data.table
   for (index in 1:ncol(imputed.matrix)) {
@@ -639,7 +684,8 @@ do.LCMD.imputation <- function(vsn.normalized.data) {
   return (imputed.data)  
 }
 
-do.peptides.aggregation <- function(imputed.data) {
+do.peptides.aggregation <- function(imputed.datam
+                                    minimum.peptide.detections = 2) {
   #
   # Aggregates the peptides' intensities in order to get the protein abundance in each condition/biological replicate
   #
@@ -652,6 +698,18 @@ do.peptides.aggregation <- function(imputed.data) {
   
   # Make a copy of the imputed data
   aggregated.data <- copy(imputed.data)
+  
+  # Count how many peptides where detected for the protein
+  aggregated.data <- aggregated.data[, peptides.detected := .N, by = protein.ids]
+  
+  # Find which rows fulfill the minimum peptides rule
+  proteins.the.threshold <- which(aggregated.data$peptides.detected > minimum.peptide.detections)
+  
+  # And keep only the proteins for which the minimum peptides threshold is fulfilled
+  aggregated.data <- aggregated.data[proteins.the.threshold,]
+  
+  # Delete the column
+  aggregated.data[, peptides.detected := NULL]
   
   # Do the aggregation of the peptides' intensity that belong to the same protein
   aggregated.data <- aggregated.data[, lapply(.SD,
@@ -1381,14 +1439,17 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   condition.B.number.of.technical <- experimental.metadata[[condition.B]]$number.of.technical.replicates
   
   # Construct the design matrix
-  design <- cbind(c(rep.int(1, condition.A.number.of.biological * condition.A.number.of.technical),
-                                        rep.int(0, condition.B.number.of.biological * condition.B.number.of.technical)),
-                  c(rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
-                                        rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical)))
+  design.condition.A <- c(rep.int(1, condition.A.number.of.biological * condition.A.number.of.technical),
+                          rep.int(0, condition.B.number.of.biological * condition.B.number.of.technical))
+  
+  design.condition.B <- c(rep.int(0, condition.A.number.of.biological * condition.A.number.of.technical),
+                          rep.int(1, condition.B.number.of.biological * condition.B.number.of.technical))
   
   #  Get the condition names
   condition.A <- conditions.to.compare[1]
   condition.B <- conditions.to.compare[2]
+  
+  design <- matrix(c(design.condition.A, design.condition.B), ncol = 2)
   
   # Add colnames to the design matrix
   colnames(design) <- c(condition.A, condition.B)
@@ -1427,7 +1488,8 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
     limma.fit <- lmFit(limma.data, design)
   }
   
-  contrast.matrix <- makeContrasts(paste0(condition.A, "-", condition.B), levels = design)
+  contrast.matrix <- makeContrasts(paste0(conditions.to.compare[1], "-", conditions.to.compare[2]),
+                                   levels = c(conditions.to.compare[1], conditions.to.compare[2]))
   
   limma.fit.contrast <- contrasts.fit(limma.fit, contrast.matrix)
   
