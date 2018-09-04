@@ -24,10 +24,13 @@ add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
   
   # Make a vector with the numeric variables
   numeric.variables <- c("plots.format",
-                         "minimum.peptide.detections")
+                         "minimum.peptide.detections",
+                         "minimum.peptides.per.protein")
   
   # Make a vector with the double variables
-  double.varables <- c("fold.change.cut.off", "FDR")
+  double.varables <- c("min.valid.values.percentance",
+                       "fold.change.cut.off",
+                       "FDR")
   
   # Now turn them to their correct variable type
   global.variables[boolean.variables] <- as.logical(global.variables[boolean.variables])

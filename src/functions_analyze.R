@@ -60,19 +60,28 @@ make.data.output.folders <- function(analysis.name) {
 }
 
 make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name, is.label.free,
-                              minimum.peptide.detections = 2, plots.format = 5) {
+                              minimum.peptide.detections = 1,
+                              min.valid.values.percentance = 50.0,
+                              minimum.peptides.per.protein = 2,
+                              plots.format = 5) {
   #
   # Makes a Venn diagram between 2 conditions
   #
-  # Args:p
+  # Args:
   #   evidence.data:          The data.table with the evidence data
   #   conditions.to.compare:  A vector with the 2 conditions to compare
   #   analysis.name:          The analysis title provided by the user
   #   is.label.free:          The experiment type, is it label-free or not        
   #
-  #   minimum.peptide.detections: Default is 2. A strictness parameter regarding how many times is a peptide measured
-  #                               If it is measures less than N times, the peptide is considered as detected but not measures
-  #                               hence its value is set to NA
+  #   minimum.peptide.detections: Default is 1. The minimum valid detections (intensities) for a peptide.
+  #                               If the peptide has less than N valid values, its value is considered as NA,
+  #                               otherwise we take the median of the intensities.
+  #
+  #   min.valid.values.percentance: Default is 50.0. The percentance of valid values for a given peptide across N samples.
+  #                                 If the peptide has less than N% valid values, it is disqualified from any further analysis.
+  #
+  #   minimum.peptides.per.protein: Default is 2. A strictness parameter regarding how many peptides should a protein have
+  #                                 If a protein has less than N peptides we disqualify the protein from the analysis.
   #
   #   plots.format:           Default is 5 (jpeg format). A numeric value indicating the format of the plots. 
   #                           The numbers correspont to:  1     2     3     4      5      6     7     8     9
@@ -106,7 +115,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
     condition.A.column <- grep(condition.A.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
     condition.B.column <- grep(condition.B.column.pattern, colnames(data), perl = TRUE, value = TRUE) 
     
-    # Keep all the columns except the opposite condition
+    # Keep all the columns except the opposite condition and the condition column ("Labeled Experiment")
     condition.A <- data[, .SD, .SDcols = !c(condition.B.column, "condition")]
     condition.B <- data[, .SD, .SDcols = !c(condition.A.column, "condition")]
   }
@@ -120,53 +129,53 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   condition.A <- dcast(condition.A,
                      protein.ids + unique.sequence.id ~ description,
                      value.var = condition.A.column,
-                     fun.aggregate = use.peptides.median)
+                     fun.aggregate = use.peptides.median,
+                     minimum.peptide.detections = minimum.peptide.detections)
   
   condition.B <- dcast(condition.B,
                        protein.ids + unique.sequence.id ~ description,
                        value.var = condition.B.column,
-                       fun.aggregate = use.peptides.median)
+                       fun.aggregate = use.peptides.median,
+                       minimum.peptide.detections = minimum.peptide.detections)
   
   # Get the number of columns on each condition
-  samples.column.number.A <- ncol(condition.A)
+  samples.column.number.A <- ncol(condition.A) 
   samples.column.number.B <- ncol(condition.B)
   
-  # Now for each row compute the NA percentance
-  condition.A[, na.percentance := ((samples.column.number.A - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number.A,
+  # Now for each condition and peptide, compute the valid values percentance
+  condition.A[, valid.percentance := ((samples.column.number.A - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/(samples.column.number.A - 2),
                .SDcols = c(3:samples.column.number.A)]
   
-  condition.B[, na.percentance := ((samples.column.number.B - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number.B,
+  condition.B[, valid.percentance := ((samples.column.number.B - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/(samples.column.number.B - 2),
               .SDcols = c(3:samples.column.number.B)]
   
-  # Then find the rows with correct observations
-  rows.with.good.observations.A <- which(condition.A$na.percentance > max.na.percentance.per.row)
-  rows.with.good.observations.B <- which(condition.B$na.percentance > max.na.percentance.per.row)
+  # Then find the rows with more than X% valid values
+  rows.with.good.observations.A <- which(condition.A$valid.percentance >= min.valid.values.percentance)
+  rows.with.good.observations.B <- which(condition.B$valid.percentance >= min.valid.values.percentance)
   
-  # Keep only them
+  # Keep the ones with more than X% valid values
   condition.A <- condition.A[rows.with.good.observations.A, ]
   condition.B <- condition.B[rows.with.good.observations.B, ]
   
-  # Remove the useless na.percentance column
-  condition.A[, na.percentance := NULL]
-  condition.B[, na.percentance := NULL]
+  # Remove the useless valid.percentance column
+  condition.A[, valid.percentance := NULL]
+  condition.B[, valid.percentance := NULL]
   
-  # Then remove the intensities columns
+  # Then get the number of peptides for each protein
   condition.A[, number.of.peptides := .N, by = "protein.ids"]
   condition.B[, number.of.peptides := .N, by = "protein.ids"]
   
-  # Find the peptides with at least 1 intensity
-  peptides.above.threshold.A <- which(condition.A$number.of.peptides >= minimum.peptide.detections)
-  peptides.above.threshold.B <- which(condition.B$number.of.peptides >= minimum.peptide.detections)
+  # Find the proteins more than X peptides
+  proteins.above.threshold.A <- which(condition.A$number.of.peptides >= minimum.peptides.per.protein)
+  proteins.above.threshold.B <- which(condition.B$number.of.peptides >= minimum.peptides.per.protein)
   
-  # Keep the ones with at least 1 intensity
-  condition.A <- condition.A[peptides.above.threshold.A,]
-  condition.B <- condition.B[peptides.above.threshold.B,]
+  # And keep only those
+  condition.A <- condition.A[proteins.above.threshold.A,]
+  condition.B <- condition.B[proteins.above.threshold.B,]
   
   # Get the protein names on this sample
   condition.A.proteins <- unique(condition.A$protein.ids)
   condition.B.proteins <- unique(condition.B$protein.ids)
-  
-  # TODO
   
   # Find which vector has the maximum length
   max.proteins <- max(length(condition.A.proteins),
@@ -222,24 +231,44 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   # Change to the plots path
   setwd(here(plots.path))
   
+  # Finally make the title and the subtitle of the venn diagram
+  venn.title <- paste0("Venn diagram of proteins, between the conditions ",
+                       conditions.to.compare[1],
+                       " and ",
+                       conditions.to.compare[2])
+  
+  # And make sure that if it is more that 70 characters,
+  # it will fit on the screen
+  venn.title <- paste0(strwrap(venn.title, 70), collapse = "\n")
+  
+  venn.subtitle <- paste0("(max ",
+                          min.valid.values.percentance,
+                          "% NAs per protein, min ",
+                          minimum.peptides.per.protein,
+                          " peptides per protein, min ",
+                          minimum.peptide.detections,
+                          " detections per peptide)")
+  
+  venn.subtitle <- paste0(strwrap(venn.subtitle, 70), collapse = "\n")
+  
   # Now draw the venn diagram
   venn.diagram <- venn.diagram(sets,
                                filename = NULL,
-                               main = paste0("Venn diagram between the conditions ",
-                                             conditions.to.compare[1],
-                                             " and ",
-                                             conditions.to.compare[2]),
+                               main = venn.title,
+                               sub  = venn.subtitle,
                                category = conditions.to.compare,
                                scaled = FALSE,
                                alpha = c(0.7, 0.7),
-                               fontfamily = "Helvetica",
+                               main.fontfamily = "Helvetica",
+                               sub.fontfamily = "Helvetica",
                                main.fontface = "bold",
                                fill = c("#999999", "#E69F00"),
                                cat.default.pos = "text",
-                               cat.pos = c(1,1),
-                               cex =  2,
+                               cat.pos = c(1, 1),
+                               cex = 2,
                                cat.cex = 2,
-                               cat.dist = c(0.05, 0.05))
+                               cat.dist = c(0.05, 0.05),
+                               margin = 0.05)
   
   # Save the boxplot after normalization with no description in high resolution 1920x1080 pixels, in the appropriate format
   ggsave(filename = paste0("venn-diagram",".",plot.format),
@@ -322,7 +351,7 @@ filter.out.reverse.and.contaminants <- function(analysis.data) {
 }
 
 use.peptides.median <- function (intensities,
-                                 do.norm = TRUE) {
+                                 minimum.peptide.detections = 1) {
   #
   # Get the median intensity of each peptide
   #
@@ -342,7 +371,7 @@ use.peptides.median <- function (intensities,
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
   # Else  re return the median of the peptides intensity
-  if (length(intensities) == 0) {
+  if (length(intensities) < minimum.peptide.detections) {
     return (list(NA))
   } else {
       return (list(median(intensities)))
@@ -636,7 +665,7 @@ do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.dat
 }
 
 do.knn.imputation <- function(vsn.normalized.data,
-                              k.neighbours = 10, max.na.percentance.per.row = 50.0) {
+                              k.neighbours = 10, min.valid.values.percentance = 50.0) {
   #
   # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
   #
@@ -654,24 +683,24 @@ do.knn.imputation <- function(vsn.normalized.data,
   samples.column.number <- ncol(imputed.data)
   
   # Now for each row compute the NA percentance
-  imputed.data[, na.percentance := ((samples.column.number - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number,
+  imputed.data[, valid.percentance := ((samples.column.number - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number,
                .SDcols = c(3:samples.column.number)]
   
   # Then find the rows with correct observations
-  rows.with.good.observations <- which(imputed.data$na.percentance > max.na.percentance.per.row)
+  rows.with.good.observations <- which(imputed.data$valid.percentance > min.valid.values.percentance)
   
   # Keep only them
   imputed.data <- imputed.data[rows.with.good.observations, ]
   
-  # Remove the useless na.percentance column
-  imputed.data <- imputed.data[, na.percentance := NULL]
+  # Remove the useless valid.percentance column
+  imputed.data <- imputed.data[, valid.percentance := NULL]
   
   # Make a matrix with only the intensities
   data.to.impute <- as.matrix(imputed.data[, -c(1,2)])
   
   # Do the kNN imputation
   knn.imputation.results <- impute.knn(data.to.impute,
-                                       k = k.neighbours, rowmax = max.na.percentance.per.row)
+                                       k = k.neighbours, rowmax = min.valid.values.percentance)
   
   # Get the new matrix
   imputed.matrix <- knn.imputation.results$data
@@ -684,7 +713,7 @@ do.knn.imputation <- function(vsn.normalized.data,
   return (imputed.data)  
 }
 
-do.peptides.aggregation <- function(imputed.datam
+do.peptides.aggregation <- function(imputed.data,
                                     minimum.peptide.detections = 2) {
   #
   # Aggregates the peptides' intensities in order to get the protein abundance in each condition/biological replicate

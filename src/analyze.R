@@ -1,22 +1,24 @@
 # Here does all the analysis steps. Results are reported in xlsx/csv media format
 # in the designated folders.
 
-# # Clear enviroment and only keep functions and global/project variables
-# rm(list = grep(paste(c("^global.variables",
-#                        "^project.variables",
-#                        lsf.str()),
-#                      collapse = "|"),
-#                ls(),
-#                value = TRUE,
-#                invert = TRUE))
-# 
-# # Return the memory to the OS
-# gc(verbose = FALSE,
-#    reset = TRUE)
+# Clear enviroment and only keep functions and global/project variables
+rm(list = grep(paste(c("^global.variables",
+                       "^project.variables",
+                       lsf.str()),
+                     collapse = "|"),
+               ls(),
+               value = TRUE,
+               invert = TRUE))
+
+# Return the memory to the OS
+gc(verbose = FALSE,
+   reset = TRUE)
 
 ### Get the analysis data from the global.variables list
 analysis.data <- global.variables[["analysis.data"]]
 minimum.peptide.detections <- global.variables[["minimum.peptide.detections"]]
+minimum.peptides.per.protein <- global.variables[["minimum.peptides.per.protein"]]
+min.valid.values.percentance <- global.variables[["min.valid.values.percentance"]]
 
 # Get the experiment metadata
 experimental.metadata <- global.variables[["experimental.metadata"]]
@@ -44,8 +46,13 @@ make.data.output.folders(analysis.name)
 evidence.data <- global.variables[["evidence.data"]]
 
 # Make the Venn diagram
-make.Venn.diagram(evidence.data, conditions.to.compare, analysis.name, is.label.free,
+make.Venn.diagram(evidence.data,
+                  conditions.to.compare,
+                  analysis.name,
+                  is.label.free,
                   minimum.peptide.detections = minimum.peptide.detections,
+                  min.valid.values.percentance = min.valid.values.percentance,
+                  minimum.peptides.per.protein = minimum.peptides.per.protein,
                   plots.format = plots.format)
 
 ### DATA IMPORT STEP ###
