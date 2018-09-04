@@ -19,6 +19,7 @@ analysis.data <- global.variables[["analysis.data"]]
 minimum.peptide.detections <- global.variables[["minimum.peptide.detections"]]
 minimum.peptides.per.protein <- global.variables[["minimum.peptides.per.protein"]]
 min.valid.values.percentance <- global.variables[["min.valid.values.percentance"]]
+knn.neighbors <- global.variables[["knn.neighbors"]]
 
 # Get the experiment metadata
 experimental.metadata <- global.variables[["experimental.metadata"]]
@@ -95,7 +96,10 @@ save.intermediate.data.tables(vsn.normalized.data,
 
 ### IMPUTATION ###
 
-imputed.data <- do.knn.imputation(vsn.normalized.data, max.na.percentance.per.row = 60)
+imputed.data <- do.knn.imputation(vsn.normalized.data,
+                                  conditions.to.compare,
+                                  knn.neighbors = knn.neighbors,
+                                  min.valid.values.percentance = min.valid.values.percentance)
 
 # Save the data.table to the intermediate-data
 save.intermediate.data.tables(imputed.data,

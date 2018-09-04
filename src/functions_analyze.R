@@ -242,8 +242,8 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   venn.title <- paste0(strwrap(venn.title, 70), collapse = "\n")
   
   venn.subtitle <- paste0("(max ",
-                          min.valid.values.percentance,
-                          "% NAs per protein, min ",
+                          100-min.valid.values.percentance,
+                          "% missing values (NAs) per protein, min ",
                           minimum.peptides.per.protein,
                           " peptides per protein, min ",
                           minimum.peptide.detections,
@@ -356,8 +356,8 @@ use.peptides.median <- function (intensities,
   # Get the median intensity of each peptide
   #
   # Args:
-  #   intensities:        The list of the peptide's intensities between the technical replicates and fractions
-  #   do.norm:            Default is TRUE. Should TODO
+  #   intensities:                The list of the peptide's intensities between the technical replicates and fractions
+  #   minimum.peptide.detections: Default is 1. The minimum number of intensities for a given peptide
   #
   # Returns:
   #   The median intensity of each peptide 
@@ -370,7 +370,7 @@ use.peptides.median <- function (intensities,
   intensities <- intensities[!is.na(intensities)]
   
   # If the number oif intensities is less than the threshold we assume that the peptide was not detected
-  # Else  re return the median of the peptides intensity
+  # Else  return the median of the peptides intensity
   if (length(intensities) < minimum.peptide.detections) {
     return (list(NA))
   } else {
@@ -379,16 +379,18 @@ use.peptides.median <- function (intensities,
 }
 
 do.vsn.normalization <- function(filtered.data, conditions.to.compare,
-                                 minimum.peptide.detections = 2, do.norm = TRUE) {
+                                 minimum.peptide.detections = 1, do.norm = TRUE) {
   #
   # Does variance stabilizing normalization (VSN) on the peptides intensities
   # 
   # Args:
   #   filtered.data:          The filtered data data.table
   #   conditions.to.compare:  The conditions to compare
-  #   minimum.peptide.detections:     Default is 2. A strictness parameter regarding how many times is a peptide measured
-  #                           If it is measures less than N times, the peptide is considered as detected but not measures
-  #                           hence its value is set to NA
+  #
+  #   minimum.peptide.detections: Default is 1. A strictness parameter regarding how many times is a peptide measured
+  #                               If it is measures less than N times, the peptide is considered as detected but not measures
+  #                               hence its value is set to NA
+  #
   #   do.norm:                Default is TRUE. Do the normalization or not? Only to use it for the plots before and 
   #                           after normalization
   #
@@ -423,7 +425,7 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
                        protein.ids + unique.sequence.id ~ biological.replicate,
                        value.var = condition,
                        fun.aggregate = use.peptides.median,
-                       do.norm = do.norm)
+                       minimum.peptide.detections = minimum.peptide.detections)
     
     # Get only the part of the data.table with the intensities of the peptides
     vsn.matrix <- as.matrix(wide.data[, .SD, .SDcols = -c(1, 2)])
@@ -434,7 +436,6 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     } else {
       vsn.matrix.normalized <- vsn.matrix
     }
-    
     
     # Replace the old values of the matrix with the new
     for (index in 1:ncol(vsn.matrix)) {
@@ -665,13 +666,18 @@ do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.dat
 }
 
 do.knn.imputation <- function(vsn.normalized.data,
-                              k.neighbours = 10, min.valid.values.percentance = 50.0) {
+                              conditions.to.compare,
+                              knn.neighbors = 10,
+                              min.valid.values.percentance = 50.0) {
   #
   # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
   #
   # Args:
-  #   vsn.normalized.data: The normalized data.table
-  #
+  #   vsn.normalized.data:  The normalized data.table
+  #   conditions.to.compare:  The conditions to compare
+  #   k.neighbors:         Default is 10. The number of neighbors for the kNN algorithm
+  #   min.valid.values.percentance: Default is 50.0. The percentance of valid values for a given peptide across N samples.
+  #                                 If the peptide has less than N% valid values, it is disqualified from any further analysis.
   # Returns:
   #   The imputated data.table
   #
@@ -679,15 +685,48 @@ do.knn.imputation <- function(vsn.normalized.data,
   # Copy the initial normalized data
   imputed.data <- copy(vsn.normalized.data)
   
-  # Get the column number 
-  samples.column.number <- ncol(imputed.data)
+  # Make the pattern for each condition
+  condition.A.pattern <- paste0("^",conditions.to.compare[1]," .*")
+  condition.B.pattern <- paste0("^",conditions.to.compare[2]," .*")
   
-  # Now for each row compute the NA percentance
-  imputed.data[, valid.percentance := ((samples.column.number - 2 - Reduce("+", lapply(.SD, is.na))) * 100 )/samples.column.number,
-               .SDcols = c(3:samples.column.number)]
+  # Get the column names of each condition
+  condition.A.columns <- grep(condition.A.pattern,
+                              colnames(imputed.data),
+                              value = TRUE,
+                              perl = TRUE)
   
-  # Then find the rows with correct observations
-  rows.with.good.observations <- which(imputed.data$valid.percentance > min.valid.values.percentance)
+  condition.B.columns <- grep(condition.B.pattern,
+                              colnames(imputed.data),
+                              value = TRUE,
+                              perl = TRUE)
+  
+  # Now get the number of columns for each condition
+  samples.column.number.A <- length(condition.A.columns)
+  samples.column.number.B <- length(condition.B.columns)
+  
+  # Now for each row and condition compute the valid values percentance
+  imputed.data[, valid.percentance.A := ((  samples.column.number.A -
+                                            Reduce("+", lapply(.SD, is.na))) * 100 )/
+                                            samples.column.number.A,
+               .SDcols = c(condition.A.columns)]
+  
+  imputed.data[, valid.percentance.B := ((  samples.column.number.B -
+                                            Reduce("+", lapply(.SD, is.na))) * 100 )/
+                                        samples.column.number.B,
+               .SDcols = c(condition.B.columns)]
+  
+  # Now add the two columns with the percentances
+  imputed.data[, valid.percentance := Reduce("+", .SD),
+               .SDcols = c("valid.percentance.A",
+                           "valid.percentance.B")]
+  
+  # Remove the unused columns
+  imputed.data[, valid.percentance.A := NULL]
+  imputed.data[, valid.percentance.B := NULL]
+  
+  # Then find the rows where the sum of the percentances is greater or equal
+  # to the minimum percentance times 2
+  rows.with.good.observations <- which(imputed.data$valid.percentance >= 2 * min.valid.values.percentance)
   
   # Keep only them
   imputed.data <- imputed.data[rows.with.good.observations, ]
@@ -700,7 +739,7 @@ do.knn.imputation <- function(vsn.normalized.data,
   
   # Do the kNN imputation
   knn.imputation.results <- impute.knn(data.to.impute,
-                                       k = k.neighbours, rowmax = min.valid.values.percentance)
+                                       k = knn.neighbors, rowmax = min.valid.values.percentance)
   
   # Get the new matrix
   imputed.matrix <- knn.imputation.results$data
@@ -714,12 +753,14 @@ do.knn.imputation <- function(vsn.normalized.data,
 }
 
 do.peptides.aggregation <- function(imputed.data,
-                                    minimum.peptide.detections = 2) {
+                                    minimum.peptides.per.protein = 2) {
   #
   # Aggregates the peptides' intensities in order to get the protein abundance in each condition/biological replicate
   #
   # Args:
-  #   imputed.data; The data.table with the imputed data
+  #   imputed.data:               The data.table with the imputed data
+  #   minimum.peptides.per.protein: Default is 2. A strictness parameter regarding how many peptides should a protein have
+  #                                 If a protein has less than N peptides we disqualify the protein from the analysis.
   #
   # Returns:
   #   The data.table with the protein abundances for each protein in each condition/biological replicate
@@ -732,7 +773,7 @@ do.peptides.aggregation <- function(imputed.data,
   aggregated.data <- aggregated.data[, peptides.detected := .N, by = protein.ids]
   
   # Find which rows fulfill the minimum peptides rule
-  proteins.the.threshold <- which(aggregated.data$peptides.detected > minimum.peptide.detections)
+  proteins.the.threshold <- which(aggregated.data$peptides.detected >= minimum.peptides.per.protein)
   
   # And keep only the proteins for which the minimum peptides threshold is fulfilled
   aggregated.data <- aggregated.data[proteins.the.threshold,]
@@ -1307,11 +1348,15 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, analysis.name
   # In case that the description is longer than 70 characters, break the title into multiple lines
   volcano.title <- paste0(strwrap(volcano.title, 70), collapse = "\n")
   
-  if (error.correction.method == "B") {
-    p.value.correction.method <- "Bonferroni"
-  } else {
-    p.value.correction.method <- "Benjamini–Hochberg"
-  }
+  switch(error.correction.method,
+         holm       = { p.value.correction.method <- "Holm"},
+         hochberg   = { p.value.correction.method <- "Hochberg "},
+         hommel     = { p.value.correction.method <- "Hommel"},
+         bonferroni = { p.value.correction.method <- "Bonferroni"},
+         BH         = { p.value.correction.method <- "Benjamini & Hochberg"},
+         BY         = { p.value.correction.method <- "Benjamini & Yekutieli"},
+         fdr        = { p.value.correction.method <- "Benjamini & Hochberg"},
+         none       = { p.value.correction.method <- "None"})
   
   # Do the same for the subtitle
   volcano.subtitle <- paste0(number.of.differentially.expressed.proteins,
@@ -1351,7 +1396,7 @@ do.volcano.plots <- function(limma.results, conditions.to.compare, analysis.name
            axis.title.y    = element_text( family  = "Helvetica",
                                            size    = 8))+
     labs(x          = "log2 fold change",
-         y          = "-log10 p-value",
+         y          = "-log10 adjusted p-value",
          title      = volcano.title,
          subtitle   = volcano.subtitle) +
     scale_color_manual(values = colorblind.palette)
