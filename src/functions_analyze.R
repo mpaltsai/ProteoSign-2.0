@@ -103,8 +103,10 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
     condition.A.column <- conditions.to.compare[1]
     condition.B.column <- conditions.to.compare[2]
     
-    # Rename the column
-    setnames(data, "protein.ids", "proteins")
+    # Keep all the columns except the opposite condition and the condition column ("Labeled Experiment")
+    condition.A <- data[, .SD, .SDcols = !c(condition.B.column)]
+    condition.B <- data[, .SD, .SDcols = !c(condition.A.column)]
+    
     
   } else {
     # Make the condition pattern e.g. ".*.h$" etc for each condition 
@@ -665,9 +667,8 @@ do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.dat
   setwd(here("src"))
 }
 
-do.knn.imputation <- function(vsn.normalized.data,
+do.QRILC.imputation <- function(vsn.normalized.data,
                               conditions.to.compare,
-                              knn.neighbors = 10,
                               min.valid.values.percentance = 50.0) {
   #
   # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
@@ -675,7 +676,6 @@ do.knn.imputation <- function(vsn.normalized.data,
   # Args:
   #   vsn.normalized.data:  The normalized data.table
   #   conditions.to.compare:  The conditions to compare
-  #   k.neighbors:         Default is 10. The number of neighbors for the kNN algorithm
   #   min.valid.values.percentance: Default is 50.0. The percentance of valid values for a given peptide across N samples.
   #                                 If the peptide has less than N% valid values, it is disqualified from any further analysis.
   # Returns:
@@ -686,8 +686,8 @@ do.knn.imputation <- function(vsn.normalized.data,
   imputed.data <- copy(vsn.normalized.data)
   
   # Make the pattern for each condition
-  condition.A.pattern <- paste0("^",conditions.to.compare[1]," .*")
-  condition.B.pattern <- paste0("^",conditions.to.compare[2]," .*")
+  condition.A.pattern <- paste0("^",conditions.to.compare[1],".*")
+  condition.B.pattern <- paste0("^",conditions.to.compare[2],".*")
   
   # Get the column names of each condition
   condition.A.columns <- grep(condition.A.pattern,
@@ -734,21 +734,30 @@ do.knn.imputation <- function(vsn.normalized.data,
   # Remove the useless valid.percentance column
   imputed.data <- imputed.data[, valid.percentance := NULL]
   
-  # Make a matrix with only the intensities
-  data.to.impute <- as.matrix(imputed.data[, -c(1,2)])
+  # Split the data of the 2 conditions
+  imputed.data.A <- imputed.data[, .SD, .SDcols = condition.A.columns]
+  imputed.data.B <- imputed.data[, .SD, .SDcols = condition.B.columns]
   
-  # Do the kNN imputation
-  knn.imputation.results <- impute.knn(data.to.impute,
-                                       k = knn.neighbors, rowmax = min.valid.values.percentance)
+  # Calculate the sigma for each condition
+  sigma.A <- sd(as.matrix(imputed.data.A), na.rm = TRUE)
+  sigma.B <- sd(as.matrix(imputed.data.A), na.rm = TRUE)
   
-  # Get the new matrix
-  imputed.matrix <- knn.imputation.results$data
+  # Now for each condition, do the imputation and reset the seed
+  # in order to  have reproducibility
+  set.seed(24101992)
+  imputed.data.A <- impute.QRILC(imputed.data.A, tune.sigma = sigma.A)[[1]]
+  set.seed(24101992)
+  imputed.data.B <- impute.QRILC(imputed.data.B, tune.sigma = sigma.B)[[1]]
   
-  # And update the initial data.table
-  for (index in 1:ncol(imputed.matrix)) {
-    imputed.data[, index + 2] <- imputed.matrix[, index]  
-  }
+  # Find the common columns
+  common.columns <- setdiff(colnames(imputed.data),
+                            c(condition.A.columns,
+                              condition.B.columns))
   
+  # Remake the data.table
+  imputed.data <- cbind(imputed.data[, .SD, .SDcols = common.columns],
+                        imputed.data.A,
+                        imputed.data.B)
   return (imputed.data)  
 }
 
@@ -1614,4 +1623,4 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
 #   }
 #   cat(length(proteins[results]), "proteins where significant:",proteins[results],"\n")
 # }
-# }
+

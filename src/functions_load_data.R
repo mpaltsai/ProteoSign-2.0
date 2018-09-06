@@ -25,8 +25,7 @@ add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
   # Make a vector with the numeric variables
   numeric.variables <- c("plots.format",
                          "minimum.peptide.detections",
-                         "minimum.peptides.per.protein",
-                         "knn.neighbors")
+                         "minimum.peptides.per.protein")
   
   # Make a vector with the double variables
   double.varables <- c("min.valid.values.percentance",
