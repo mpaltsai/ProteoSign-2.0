@@ -1,0 +1,18 @@
+parameter,value
+analysis.name,PXD002622
+conditions.to.compare,"ADC, SCC"
+replicate.multiplexing.is.used,FALSE
+dataset.origin,MaxQuant
+is.label.free,FALSE
+is.isobaric,TRUE
+timestamp.to.keep,
+subset.to.keep,
+raw.files.to.remove,
+raw.files.to.rename,
+minimum.peptide.detections,1
+minimum.peptides.per.protein,2
+min.valid.values.percentance,50.0
+plots.format,5
+error.correction.method,BH
+fold.change.cut.off,1.5
+FDR,0.05

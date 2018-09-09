@@ -71,6 +71,30 @@ if (is.label.free == TRUE) {
   global.variables[["raw.files.condition"]] <- label.free.raw.files.condition.matrix
 }
 
+if (is.isobaric == TRUE) {
+  
+  # Path to the tags.to.conditions file for isotopic experiments 
+  tags.to.conditions.path <- paste(here(),
+                                   "data-input/test-case",
+                                   "tags-to-conditions.csv",
+                                   sep = "/")
+  
+  # Read the tags.to.conditions file
+  tags.to.conditions.matrix <- read.csv(tags.to.conditions.path,
+                                        stringsAsFactors = FALSE,
+                                        check.names = FALSE)
+  
+  cat("Isotopic experiment: tags-to-conditions file loaded!\n")
+  
+  tags.to.conditions.matrix$tag <- paste0("reporter.intensity.",
+                                          tags.to.conditions.matrix$tag)
+  
+  tags.to.conditions <- make.tags.to.conditions.list()
+  # Add the file to the global data
+  global.variables[["raw.files.condition"]] <- label.free.raw.files.condition.matrix
+  
+}
+
 # Add the experimental structrue to the global.variables list
 global.variables[["experimental.structure"]] <- experimental.structure.table
 
@@ -98,37 +122,57 @@ colnames(evidence.data) <- trimmed.and.lowercased.column.names
 # Get the evidence data column names
 evidence.data.column.names <- colnames(evidence.data)
 
+# 1:  For Isotopic experiment e.g. SILAC
+# 2:  For Label-free
+# 3:  For Isobaric e.g. TMT
+# Make an experimental setup code for fast case switch
+experimental.type <-  (is.label.free * 1) +
+                      (is.isobaric * 2)   + 1
+
 # The needed columns for the analysis depending on the software
 if (dataset.origin == "MaxQuant") {
-  
-  intensity.columns <- grep("^intensity",
-                            evidence.data.column.names,
-                            perl = TRUE,
-                            value = TRUE)
-  
-  if (is.label.free == FALSE &
-      is.isobaric == FALSE) {
-    # Get the conditions to compare parameter value
-    conditions.to.compare <- global.variables[["conditions.to.compare"]]
-    
-    # Lowercase them
-    conditions.to.compare <- tolower(conditions.to.compare)
-    
-    # Make a pattern e.g "\\.(h|m)$"
-    conditions.to.compare.pattern <- paste0("\\.(",
-                                            conditions.to.compare[1],
-                                            "|",
-                                            conditions.to.compare[2],
-                                            ")$")
-    
-    # Get the "intensity.X" columns where X stands for l, m, h respectivelly from the
-    # intensity columns
-    intensity.columns <- grep(conditions.to.compare.pattern,
-                              intensity.columns,
-                              perl = TRUE,
-                              value = TRUE)
-  }
-  
+  switch( experimental.type,
+         {
+           # Case Isotopic
+           intensity.columns <- grep("^intensity",
+                                     evidence.data.column.names,
+                                     perl = TRUE,
+                                     value = TRUE)
+           
+            # Get the conditions to compare parameter value
+            conditions.to.compare <- global.variables[["conditions.to.compare"]]
+            
+            # Lowercase them
+            conditions.to.compare <- tolower(conditions.to.compare)
+            
+            # Make a pattern e.g "\\.(h|m)$"
+            conditions.to.compare.pattern <- paste0("\\.(",
+                                                    conditions.to.compare[1],
+                                                    "|",
+                                                    conditions.to.compare[2],
+                                                    ")$")
+            
+            # Get the "intensity.X" columns where X stands for l, m, h respectivelly from the
+            # intensity columns
+            intensity.columns <- grep(conditions.to.compare.pattern,
+                                      intensity.columns,
+                                      perl = TRUE,
+                                      value = TRUE)
+          },
+         {
+           # Case Label-Free
+           intensity.columns <- grep("^intensity",
+                                     evidence.data.column.names,
+                                     perl = TRUE,
+                                     value = TRUE) 
+         },
+         {
+           # Case Isobaric
+           intensity.columns <- grep("^reporter.intensity.[[:digit:]]+$",
+                                     evidence.data.column.names,
+                                     perl = TRUE,
+                                     value = TRUE)
+         })
   
   evindence.columns.to.keep <- c("proteins",
                                  "raw.file",
@@ -159,16 +203,16 @@ cat("Evidence file loaded!\n")
 
 # Get the timestamp and the culture to analyze
 timestamp.to.keep <- global.variables[["timestamp.to.keep"]]
-culture.to.keep <- global.variables[["culture.to.keep"]]
+subset.to.keep <- global.variables[["subset.to.keep"]]
 
 # If we have to select only a subset based on a timestamp or a culture
 if (timestamp.to.keep != "" | 
-    culture.to.keep != "") {
+    subset.to.keep != "") {
 
   # Clean evidence file on specific timestamp or culture
   evidence.data <- keep.only.specific.timestamps.or.cultures(evidence.data,
                                                              timestamp.to.keep,
-                                                             culture.to.keep)
+                                                             subset.to.keep)
 }
 
 # If there ar raw file to be renamed, rename them
