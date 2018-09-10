@@ -71,6 +71,7 @@ if (is.label.free == TRUE) {
   global.variables[["raw.files.condition"]] <- label.free.raw.files.condition.matrix
 }
 
+# Is the experiment isobaric
 if (is.isobaric == TRUE) {
   
   # Path to the tags.to.conditions file for isotopic experiments 
@@ -86,12 +87,15 @@ if (is.isobaric == TRUE) {
   
   cat("Isotopic experiment: tags-to-conditions file loaded!\n")
   
+  # Add the "reporter.intensity." prefix to the tag column
   tags.to.conditions.matrix$tag <- paste0("reporter.intensity.",
                                           tags.to.conditions.matrix$tag)
   
-  tags.to.conditions <- make.tags.to.conditions.list()
-  # Add the file to the global data
-  global.variables[["raw.files.condition"]] <- label.free.raw.files.condition.matrix
+  # Match columns to the conditions
+  tags.to.conditions <- make.tags.to.conditions.list(tags.to.conditions.matrix)
+  
+  # Add the list to the global data
+  global.variables[["tags.to.conditions"]] <- tags.to.conditions
   
 }
 
@@ -168,7 +172,7 @@ if (dataset.origin == "MaxQuant") {
          },
          {
            # Case Isobaric
-           intensity.columns <- grep("^reporter.intensity.[[:digit:]]+$",
+           intensity.columns <- grep("^reporter\\.intensity\\.[[:digit:]]+$",
                                      evidence.data.column.names,
                                      perl = TRUE,
                                      value = TRUE)

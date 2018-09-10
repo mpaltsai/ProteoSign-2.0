@@ -174,3 +174,34 @@ remove.and.rename.raw.files <- function(evidence.data, raw.files.to.remove, raw.
   
   return (data.cleaned)
 }
+
+make.tags.to.conditions.list <- function(tags.to.conditions.matrix) {
+  #
+  # Wraps the different tags to one condition foir each condition
+  #
+  # Args:
+  #   tags.to.conditions.matrix: The tags to conditions matrix
+  #
+  # Returns
+  #   A list where the names of each element is the condition and the elements are 
+  #   the columns of each condition
+  #
+  
+  # Make the empty tags.to.conditions list
+  tags.to.conditions.list <- list()
+  
+  # Get the unique conditions
+  conditions <- unique(tags.to.conditions.matrix$condition)
+  
+  # Now for each condition
+  for (condition in conditions) {
+    
+    # Find the index of each condition
+    condition.indexes <- which(tags.to.conditions.matrix$condition == condition)
+    
+    # Then add the new element ant the reporter intensity columns for this condition
+    tags.to.conditions.list[[condition]] <- tags.to.conditions.matrix$tag[condition.indexes]
+  }
+  
+  return (tags.to.conditions.list)
+}

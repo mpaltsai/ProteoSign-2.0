@@ -156,6 +156,66 @@ build.condition.to.raw.files.from.matrix <- function(raw.files.to.coditions.matr
   return (conditions.to.raw.files.list)
 }
 
+
+merge.reporter.intensity.columns <- function(evidence.data, tags.to.conditions) {
+  #
+  # Merges the columns of the reporter intensities for isobaric experiments for each condition and converts the 
+  # 0s to NAs
+  #
+  # Args:
+  #   evidence.data:      The evidence data.table
+  #   tags.to.conditions: A list with the  columns to combine for each condition
+  #
+  # Returns:
+  #   The evidence data.table with its reporter intensities columns combined
+  #
+  
+  # Get the evidence data
+  data <- copy(evidence.data)
+  
+  # Convert the 0s to NAs
+  data <- zeros.to.nas(data, prefix = "^reporter\\.intensity\\.")
+  
+  # The the columns for each condition
+  condition.A.columns <- tags.to.conditions[[1]]
+  condition.B.columns <- tags.to.conditions[[2]]
+  
+  # The new column will be "intensity.X" where X is the condition
+  condition.A.column <- paste0("intensity.",
+                               names(tags.to.conditions)[1])
+  
+  condition.B.column <- paste0("intensity.",
+                               names(tags.to.conditions)[2])
+  
+  # Also store the unsed columns
+  unsed.columns <- setdiff(colnames(data), c(condition.A.columns, condition.B.columns, "id"))
+  
+  # Suset the data for each condition
+  evidence.data.A <- data[, .SD, .SDcols = c("id", condition.A.columns)]
+  evidence.data.B <- data[, .SD, .SDcols = c("id", condition.B.columns)]
+  
+  # Melt them
+  evidence.data.A.melted <- melt(evidence.data.A, id.vars = "id")
+  evidence.data.B.melted <- melt(evidence.data.B, id.vars = "id")
+  
+  # Now dcast the so the different columns will be combined into a list
+  evidence.data.A.merged <- dcast(evidence.data.A.melted, id~0, fun.aggregate = list)
+  evidence.data.B.merged <- dcast(evidence.data.B.melted, id~0, fun.aggregate = list)
+  
+  # Fix the name of the newly created column 
+  setnames(evidence.data.A.merged, ".", condition.A.column)
+  setnames(evidence.data.B.merged, ".", condition.B.column)
+  
+  # Merge the 2 data.table for each condition
+  intensities.data.merged <- merge(evidence.data.A.merged, evidence.data.B.merged, by = "id")
+  
+  # And finally add the unsed columns
+  data.merged <- cbind(intensities.data.merged,
+                       data[, .SD, .SDcols = (unsed.columns)])
+  
+  return (data.merged)
+}
+
 check.replicates.number <- function(replicate.multiplexing, replicates) {
   #
   # Check if the replicates are more than 1, providing that we do not utilize replicates multiplexing
@@ -958,7 +1018,7 @@ trim.evidence.data.protein.descriptions <- function(evidence.data, protein.descr
 }
 
 add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.compare, conditions.to.raw.files.list,
-                                           evidence.metadata, data.origin, is.label.free, is.isobaric) {
+                                           evidence.metadata, dataset.origin, is.label.free, is.isobaric) {
   #
   # Adds a condition column to the evidence.data table with the condition name given by the user
   #
@@ -968,7 +1028,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   #   conditions.to.raw.files.list: The list of conditions to raw.files
   #   evidence.metadata:            The evidence metadata regarding the column names for raw.file definition
   #                                 and condition column definition
-  #   data.origin:                  The origin of the data 'MaxQuant' or 'Proteome-Discoverer'
+  #   dataset.origin:               The origin of the data 'MaxQuant' or 'Proteome-Discoverer'
   #   is.label.free:                TRUE or FALSE depending on the experiment
   #   is.isobaric:                  TRUE or FALSE depending on the experiment
   # 
@@ -977,7 +1037,7 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   #
   
   # Do the data origin from MaxQuant?
-  origin.is.maxquant <- data.origin == "MaxQuant"
+  origin.is.maxquant <- dataset.origin == "MaxQuant"
   
   # Copy the evidence data in order to dodge the data.table bug
   evidence.data.reformed <- copy(evidence.data)
@@ -1003,15 +1063,15 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   # 2:  # MaxQuant Isotopic
   # 3:  # Proteome-Discoverer Label-Free
   # 4:  # MaxQuant Label-Free
-  # 5:  --- Illegal State ---
-  # 6:  # Proteome-Discoverer Isobaric
-  # 7:  # MaxQuant isobaric
+  # 5:  # Proteome-Discoverer Isobaric
+  # 6:  # MaxQuant isobaric
+  
   status.code <-  (origin.is.maxquant * 1) +
                   (is.label.free * 2) +
-                  (is.isobaric * 3) + 1
+                  (is.isobaric * 4) + 1
   
-  # If we are on an isotopic experiment, there is no need to add the condition column
-  if (status.code == 1  | status.code == 2) {
+  # If we are on an isotopic or isobaric experiment, there is no need to add the condition column
+  if (status.code < 3  | status.code > 4) {
     return (evidence.data.reformed)
   }
   
@@ -1073,20 +1133,19 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
               evidence.data.reformed <- evidence.data.reformed[indexes.of.condition, condition := condition.to.compare] 
             },
             {
-              cat("Incorrect case in add.compare.column.to.evidence...\n")
+              # cat("Incorrect case in add.compare.column.to.evidence...\n")
+              stop("add.user.condition illegan case in switch!\n")
             },
             {
-              # Proteome-Discoverer Isobaric
-              
-              # Add the condition on these rows
-              evidence.data.reformed <- evidence.data.reformed[,condition := get(condition.column)]
+              stop("add.user.condition illegan case in switch!\n")
               
             },
             {
-              # MaxQuant isobaric
-              
-              # Add the condition on these rows
-              evidence.data.reformed <- evidence.data.reformed[, condition:=get(condition.column)] 
+              # # MaxQuant isobaric
+              # 
+              # # Add the condition on these rows
+              # evidence.data.reformed <- evidence.data.reformed[, condition:=get(condition.column)] 
+              stop("add.user.condition illegan case in switch!\n")
             })
   }
   
@@ -1131,8 +1190,8 @@ discard.useless.conditions.per.experiment <- function(evidence.data, conditions.
          },
          {
             # Isobaric Labeled Experiment
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
           })
   
   return (cleaned.evidence.data)
@@ -1403,12 +1462,13 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
   return (evidence.data.subset)
 }
 
-zeros.to.nas <- function(evidence.data) {
+zeros.to.nas <- function(evidence.data, prefix = "^intensity") {
   #
   # Converts the zeros to NAs
   # 
   # Args:
-  #   evidence.data: The evidence.data.table
+  #   evidence.data:  The evidence.data.table
+  #   prefix:         Default is "^intensity". The prefix to look for
   # 
   # Returns:
   #   The altered evidence data.tables
@@ -1418,7 +1478,7 @@ zeros.to.nas <- function(evidence.data) {
   data <- copy(evidence.data)
   
   # Find the Intensity column names
-  intensity.columns <- grep("^intensity", colnames(data), perl = TRUE, value = TRUE)
+  intensity.columns <- grep(prefix, colnames(data), perl = TRUE, value = TRUE)
   
   # In case of a Labeled Experiment we expect 2 "intensity.X" columns
   if (length(intensity.columns) == 2) {
@@ -1437,13 +1497,18 @@ zeros.to.nas <- function(evidence.data) {
     
   } else {
     
-    data <- data[, eval(intensity.columns) := as.numeric(get(intensity.columns))]
+    # Here we use the for for label-free experiment and isobaric experiments
+    for (condition in intensity.columns) {
+      
+      data <- data[, eval(condition) := as.numeric(get(condition))]
+      
+      # Find the zeros in the intensity column
+      zeros <- which(data[, get(condition)] == 0)
+      
+      # Convert the zeros to NAs
+      data <- data[zeros, eval(condition) := NA] 
+    }
     
-    # Find the zeros in the intensity column
-    zeros <- which(data[, get(intensity.columns)] == 0)
-    
-    # Convert the zeros to NAs
-    data <- data[zeros, eval(intensity.columns) := NA]
   }
   
   return (data)
@@ -1508,15 +1573,15 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   
   # In the case of an isobaric labeled experiment we can treat is as if it was label-free,
   # after some reformating 
-  if (is.isobaric == TRUE) {
-    
-    cat("We have an isobaric label file!\n")
-    # Reform the evidence data table
-    evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, dataset.origin)
-    
-    # Set the label.free flag to TRUE
-    is.label.free <- TRUE
-  }
+  # if (is.isobaric == TRUE) {
+  #   
+  #   cat("We have an isobaric label file!\n")
+  #   # Reform the evidence data table
+  #   evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, dataset.origin)
+  #   
+  #   # Set the label.free flag to TRUE
+  #   is.label.free <- TRUE
+  # }
   
   # Reset evidence column names
   evidence.column.names <- colnames(evidence.data)

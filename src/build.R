@@ -61,6 +61,18 @@ if (is.label.free == TRUE) {
   
 } 
 
+# In case of isobaric experiment, fix the evidence columns
+if (is.isobaric == TRUE) {
+  
+  # The the tags to conditions
+  tags.to.conditions <- global.variables[["tags.to.conditions"]]
+  
+  # And combine the "reporter.intensities.X" columns into one for each condition and convert 0s to NAs
+  evidence.data <- merge.reporter.intensity.columns(evidence.data, tags.to.conditions)
+  
+  
+}
+
 # If we are on a label-free experiment, add the conditions, otherwise just add a generic description
 if (is.label.free == TRUE) {
   experimental.structure$condition <- raw.files.condition.matrix$condition 
@@ -178,17 +190,11 @@ global.variables[["experimental.metadata"]] <- experimental.metadata
 # Update the experimental.structure global variable 
 global.variables[["experimental.structure"]] <- experimental.structure
 
-# Store max biological replicates for duplicates handling from limma
-global.variables[["max.biological.replicates"]] <- experimental.structure[,
-                                                                          which.max(biological.replicate)]
-
-# Store the minimum number of technical replicates
-global.variables[["min.technical.replicates"]] <- min(experimental.structure[,
-                                                           .SD[which.max(technical.replicate)],
-                                                           by = biological.replicate]$technical.replicate)
-
-# Replace the 0s with NAs
-evidence.data <- zeros.to.nas(evidence.data)
+# If we are not in a isobaric experiment, we replace 0s with NAs here, otherwise, we do it earlier as it is easier
+if (is.isobaric == FALSE) {
+  # Replace the 0s with NAs
+  evidence.data <- zeros.to.nas(evidence.data, prefix = "^intensity")
+}
 
 # Now build the analysis data 
 analysis.data <- build.analysis.data(protein.groups.data = protein.groups.data,
