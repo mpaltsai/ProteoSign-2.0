@@ -182,10 +182,10 @@ merge.reporter.intensity.columns <- function(evidence.data, tags.to.conditions) 
   
   # The new column will be "intensity.X" where X is the condition
   condition.A.column <- paste0("intensity.",
-                               names(tags.to.conditions)[1])
+                               tolower(names(tags.to.conditions)[1]))
   
   condition.B.column <- paste0("intensity.",
-                               names(tags.to.conditions)[2])
+                               tolower(names(tags.to.conditions)[2]))
   
   # Also store the unsed columns
   unsed.columns <- setdiff(colnames(data), c(condition.A.columns, condition.B.columns, "id"))
@@ -1283,17 +1283,6 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
     
     # Renew the evidence columns vector
     evidence.columns <- colnames(evidence.data)
-    
-    # Clean 'Intensity' part from 'Intensity XYZ' columns
-    # Not sure...
-    if (is.isobaric == FALSE) {
-      # colnames(evidence.data) <- sub('intensity\\.(.+)',
-      #                                "\\1",
-      #                                evidence.columns,
-      #                                perl = TRUE)
-    } else {
-      # yorgodilo had something commented here...
-    }
   }
   
   # Renew the evidence columns vector
@@ -1307,7 +1296,7 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
     
     setnames(evidence.data, "annotated.sequence", "unique.sequence.id")
     
-    evidence[, unique.sequence.id := sub(".*? (.*?) .*",
+    evidence[, unique.sequence.id := sub(".*?(.*?).*",
                                            "\\1",
                                            evidence$unique.sequence.id)]
   }
@@ -1369,29 +1358,48 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
                    "protein.ids",
                    "unique.sequence.id")
             
-            # evidence.data.subset <- evidence.data.subset[, intensity.columns[2]:=NULL]
-            
+
             intensity.column.1 <- intensity.columns[1]
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
-            evidence.data.subset.1 <- evidence.data.subset[, 
-                                                         .("intensity.1" = list(get(intensity.column.1))),
-                                                         by=.(description,
-                                                              protein.ids,
-                                                              unique.sequence.id,
-                                                              condition)]
+            
+            if (is.isobaric == TRUE) {
+              evidence.data.subset.1 <- evidence.data.subset[, 
+                                                             .("intensity.1" = list(unlist(get(intensity.column.1)))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            } else {
+              evidence.data.subset.1 <- evidence.data.subset[, 
+                                                             .("intensity.1" = list(get(intensity.column.1))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            }
+           
             
             setnames(evidence.data.subset.1, "intensity.1", intensity.column.1)
             
             intensity.column.2 <- intensity.columns[2]
             
-            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
-            evidence.data.subset.2 <- evidence.data.subset[, 
-                                                           .("intensity.2" = list(get(intensity.column.2))),
-                                                           by=.(description,
-                                                                protein.ids,
-                                                                unique.sequence.id,
-                                                                condition)]
+            if (is.isobaric == TRUE) {
+              evidence.data.subset.2 <- evidence.data.subset[, 
+                                                             .("intensity.2" = list(unlist(get(intensity.column.2)))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            } else {
+              evidence.data.subset.2 <- evidence.data.subset[, 
+                                                             .("intensity.2" = list(get(intensity.column.2))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            }
+            
             
             setnames(evidence.data.subset.2, "intensity.2", intensity.column.2)
             
@@ -1621,7 +1629,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
                                                               is.label.free,
                                                               is.isobaric)
   
-  if (is.label.free == FALSE & is.isobaric == FALSE) {
+  if (is.label.free == FALSE) {
     
     # In case of labeled experiment, merge by the "columns raw.file",
     # "condition"

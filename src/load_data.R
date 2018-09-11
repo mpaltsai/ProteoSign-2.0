@@ -206,17 +206,17 @@ if (dataset.origin == "MaxQuant") {
 cat("Evidence file loaded!\n")
 
 # Get the timestamp and the culture to analyze
-timestamp.to.keep <- global.variables[["timestamp.to.keep"]]
-subset.to.keep <- global.variables[["subset.to.keep"]]
+timestamps.to.keep <- global.variables[["timestamps.to.keep"]]
+subsets.to.keep <- global.variables[["subsets.to.keep"]]
 
 # If we have to select only a subset based on a timestamp or a culture
-if (timestamp.to.keep != "" | 
-    subset.to.keep != "") {
+if (length(timestamps.to.keep) != 0 | 
+    length(subsets.to.keep)    != 0) {
 
   # Clean evidence file on specific timestamp or culture
   evidence.data <- keep.only.specific.timestamps.or.cultures(evidence.data,
-                                                             timestamp.to.keep,
-                                                             subset.to.keep)
+                                                             timestamps.to.keep,
+                                                             subsets.to.keep)
 }
 
 # If there ar raw file to be renamed, rename them

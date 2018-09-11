@@ -740,7 +740,7 @@ do.QRILC.imputation <- function(vsn.normalized.data,
   
   # Calculate the sigma for each condition
   sigma.A <- sd(as.matrix(imputed.data.A), na.rm = TRUE)
-  sigma.B <- sd(as.matrix(imputed.data.A), na.rm = TRUE)
+  sigma.B <- sd(as.matrix(imputed.data.B), na.rm = TRUE)
   
   # Now for each condition, do the imputation and reset the seed
   # in order to  have reproducibility
@@ -748,7 +748,7 @@ do.QRILC.imputation <- function(vsn.normalized.data,
   imputed.data.A <- impute.QRILC(imputed.data.A, tune.sigma = sigma.A)[[1]]
   set.seed(24101992)
   imputed.data.B <- impute.QRILC(imputed.data.B, tune.sigma = sigma.B)[[1]]
-  
+
   # Find the common columns
   common.columns <- setdiff(colnames(imputed.data),
                             c(condition.A.columns,

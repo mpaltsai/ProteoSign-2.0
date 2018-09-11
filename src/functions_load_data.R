@@ -44,6 +44,41 @@ add.analysis.parameters.to.global.variables <- function(analysis.metadata) {
   # Trim them in case of whitespaces
   global.variables[["conditions.to.compare"]] <- trimws(conditions.to.compare)
   
+  # If timestamp.to.keep is null, make it a vector
+  if (is.null(global.variables[["timestamps.to.keep"]]) == TRUE) {
+    global.variables[["timestamps.to.keep"]] <- c()
+  } else {
+    
+    # Split the timestamp.to.keep at the comma
+    timestamps.to.keep <- unlist(strsplit(global.variables[["timestamps.to.keep"]],
+                                         split = ","))
+    
+    # Trim the condition from whitespaces
+    timestamps.to.keep <- trimws(timestamps.to.keep)
+    
+    # Update the global variables
+    global.variables[["timestamps.to.keep"]] <- timestamps.to.keep
+    
+  }
+  
+  
+  # If timestamp.to.keep is null, make it a vector
+  if (is.null(global.variables[["subsets.to.keep"]]) == TRUE) {
+    global.variables[["subsets.to.keep"]] <- c()
+  } else {
+    
+    # Split the timestamp.to.keep at the comma
+    subsets.to.keep <- unlist(strsplit(global.variables[["subsets.to.keep"]],
+                                         split = ","))
+    
+    # Trim the condition from whitespaces
+    subsets.to.keep <- trimws(subsets.to.keep)
+    
+    # Update the global variables
+    global.variables[["subsets.to.keep"]] <- subsets.to.keep
+    
+  }
+  
   return (global.variables)
   
 }
@@ -73,14 +108,14 @@ trim.and.lowercase.column.names <- function(old.column.names) {
 }
 
 keep.only.specific.timestamps.or.cultures <- function(evidence.data, 
-                                                      timestamp.to.keep = "", subset.to.keep = "") {
+                                                      timestamps.to.keep = c(), subsets.to.keep = c()) {
   #
   # Does filtering of the raw file column based on the wanted timestamp or subset
   #
   # Args:
   #   evidence.data:      The evidence data.table
-  #   timestamp.to.keep:  Default is NA. The timestamp i want to investigate
-  #   subset.to.keep:     Default is NA. The subproteome on which i want to focus
+  #   timestamps.to.keep:  Default is empty vector. A vector of the timestamps I want to investigate
+  #   subsets.to.keep:     Default is empty vector. A vector of the subsets.to.keep I want to investigate
   #
   # Returns:
   #   The cleaned evidence data.table with only the rows corresponding to specific timestamp and/or subset
@@ -90,7 +125,7 @@ keep.only.specific.timestamps.or.cultures <- function(evidence.data,
   data.to.clean <- copy(evidence.data)
   
   # Keep only wanted timestamp
-  if (timestamp.to.keep != "") {
+  for (timestamp.to.keep in timestamps.to.keep) {
     # Make the pattern of the timestamp to keep
     timestamp.to.keep.pattern <- paste0(".*", timestamp.to.keep, ".*")
     
@@ -104,7 +139,7 @@ keep.only.specific.timestamps.or.cultures <- function(evidence.data,
   }
   
   # Keep only the wanted subset of the proteome
-  if (subset.to.keep != "") {
+  for (subset.to.keep in subsets.to.keep) {
     # Make the pattern of the timestamp to keep
     subset.to.keep.pattern <- paste0(".*", subset.to.keep, ".*")
     

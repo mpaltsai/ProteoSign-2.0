@@ -227,8 +227,12 @@ if (length(experiment.type) == 1) {
   # Take their union
   na.rows <- union(na.rows.conditon.A, na.rows.conditon.B)
   
-  # And remove those rows in order to have rows where we have measurements in both conditions
-  analysis.data <- analysis.data[-c(na.rows), ]
+  # Remove NA rows only if they exist!
+  if (length(na.rows) != 0) {
+    # And remove those rows in order to have rows where we have measurements in both conditions
+    analysis.data <- analysis.data[-c(na.rows), ]
+  }
+  
   
   # Discard the condition columns as now there is no need for it
   analysis.data <- analysis.data[, condition := NULL]
