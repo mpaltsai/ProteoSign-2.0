@@ -186,6 +186,8 @@ if (dataset.origin == "MaxQuant") {
                                  "protein.descriptions",
                                  "peptide.id",
                                  "unique.sequence.id",
+                                 "peptide.quan.usage",
+                                 "quan.usage",
                                  intensity.columns)
   
   # In any case, we take the intersection
@@ -198,9 +200,58 @@ if (dataset.origin == "MaxQuant") {
   
   
 } else {
+  switch( experimental.type,
+          {
+            # Proteome Discoverer Isotopic
+            
+            # Prepare the intensity columns
+            intensity.columns <- c()
+            
+            # Renames the potential labels
+            potential.labels <- c("light", "medium", "heavy")
+            
+            # If the potential label exists in the colnames of the Proteome Discoverer file
+            for (label in potential.labels) {
+              if (label %in% evidence.data.column.names) {
+                
+                # Prepare the new label
+                new.label <- paste("intensity", substr(label, 1, 1), sep = ".")
+                
+                # Update the intensity columns
+                intensity.columns <- c(intensity.columns, new.label)
+                
+                # Rename the e.g. "light" to "intensity.l"
+                setnames(evidence.data, label, new.label)
+              }
+            }
+            
+          },
+          {
+            # Proteome Discoverer Label-Free
+          },
+          {
+            # Proteome Discoverer Isobaric
+          })
+  
   # Case proteome discoverer
   evindence.columns.to.keep <- c("unique.sequence.id",
-                                 "annotated.sequence")
+                                 "annotated.sequence",
+                                 "spectrum.file",
+                                 # "modifications",
+                                 "protein.group.accessions",
+                                 "protein.accessions",
+                                 "protein.descriptions",
+                                 "quan.usage",
+                                 "peptide.quan.usage",
+                                 intensity.columns)
+  
+  # In any case, we take the intersection
+  evindence.columns.subset <- intersect(evidence.data.column.names,
+                                        evindence.columns.to.keep)
+  
+  # Now subset the columns to keep only the needed, in order to make
+  # the data.table as light-weight as possible
+  evidence.data <- evidence.data[, .SD, .SDcols = evindence.columns.subset]
 }
 
 cat("Evidence file loaded!\n")

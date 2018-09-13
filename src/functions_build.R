@@ -649,11 +649,14 @@ find.proteome.discoverer.protein.column <- function(evidence.data) {
   # Initialize the protein groups column
   protein.groups.column <- ""
   
+  # Get the evidence data.column names
+  evidence.data.column.names <- colnames(evidence.data)
+  
   # And find the correct protein groups column depending on the version
-  if ("Protein Group Accessions" %in% colnames(evidence.data) == TRUE) {
-    protein.groups.column <- "Protein Group Accessions"
-  } else if ("Protein Accessions" %in% colnames(evidence.data) == TRUE) {
-    protein.groups.column <- "Protein Accessions"
+  if (("protein.group.accessions" %in%  evidence.data.column.names) == TRUE) {
+    protein.groups.column <- "protein.group.accessions"
+  } else if (("protein.accessions" %in% evidence.data.column.names) == TRUE) {
+    protein.groups.column <- "protein.accessions"
   } else {
     # If the is no such column, abort the scripts execution
     stop("The evidence dataset does not contain the columns 'Protein Group Accessions' or 'Protein Accessions'. Aborting...\n")
@@ -1152,16 +1155,18 @@ add.user.condition.column.to.evidence <- function(evidence.data, conditions.to.c
   return (evidence.data.reformed)
 }
 
-discard.useless.conditions.per.experiment <- function(evidence.data, conditions.to.compare, is.label.free, is.isobaric) {
+discard.useless.conditions.per.experiment <- function(evidence.data, conditions.to.compare, dataset.origin, is.label.free, is.isobaric) {
   #
   # Removes the useless rows for the conditions in which we are not interested, dependingon the experimental setup
   #
   # Args:
   #   evidence.data:          The evidence data.table
   #   conditions.to.compare:  The vector with the condition I want to compare
+  #   dataset.origin:          String, "MaxQuant" or "Proteome-Discoverer" depending on the data source
   #   is.label.free:          TRUE or FALSE depending on if it is an label-free experiment or not.
   #   is.isobaric:            TRUE or FALSE depending on if it is an isobaric experiment or not.
-  #
+  #   condition.column        Can be "condition" or "raw.file" or "spectrum.file"
+  
   # Returns:
   #   The cleaned evidence data.table
   #
@@ -1169,29 +1174,82 @@ discard.useless.conditions.per.experiment <- function(evidence.data, conditions.
   # Copy the data that i want to clean
   cleaned.evidence.data <- copy(evidence.data)
   
-  # Make an id to determine the experimental setup
-  case.id <-  (is.label.free * 1) + 
-              (is.isobaric * 2) + 1
+  # Does the dataset come from MaxQuant?
+  origin.is.maxquant <- dataset.origin == "MaxQuant"
+  
+  # Make a status code for fast comparisons
+  # 1:  # Proteome-Discoverer Isotopic
+  # 2:  # MaxQuant Isotopic
+  # 3:  # Proteome-Discoverer Label-Free
+  # 4:  # MaxQuant Label-Free
+  # 5:  # Proteome-Discoverer Isobaric
+  # 6:  # MaxQuant isobaric
+  case.id <-  (origin.is.maxquant *1) +
+              (is.label.free * 2) + 
+              (is.isobaric * 4) + 1
   
   # By default clean all the blanks and the NAs
-  
   # Now depending on the experimental setup remove the appropropriate rows
+  
   switch(case.id,
          {
-            # Isotopic Experiment  
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
+           # Proteome-Discoverer Isotopic
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "BLANK",
+                                                              by.column = "spectrum.file")
+           
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "NA",
+                                                              by.column = "spectrum.file")
+           },
+         {
+           # MaxQuant Isotopic
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                               "BLANK", 
+                                                               by.column = "raw.file")
+            
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                               "NA",
+                                                               by.column = "raw.file")
             
          },
          {
-            # Label-free Experiment
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK")
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA")
+           # Proteome-Discoverer Label-Free
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "BLANK",
+                                                              by.column = "condition")
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "NA",
+                                                              by.column = "condition")
          },
          {
-            # Isobaric Labeled Experiment
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "BLANK", "raw.file")
-            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data, "NA", "raw.file")
+            # MaxQuant Label-Free
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                               "BLANK",
+                                                               by.column = "condition")
+            cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                               "NA",
+                                                               by.column = "condition")
+         },
+         {
+           # Proteome-Discoverer Isobaric
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "BLANK",
+                                                              by.column = "spectrum.file")
+           
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "NA",
+                                                              by.column = "spectrum.file")
+         },
+         {
+            # MaxQuant isobaric
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "BLANK", 
+                                                              by.column = "raw.file")
+           
+           cleaned.evidence.data <- clear.user.condition.rows(cleaned.evidence.data,
+                                                              "NA",
+                                                              by.column = "raw.file")
           })
   
   return (cleaned.evidence.data)
@@ -1209,12 +1267,8 @@ clear.user.condition.rows <- function(evidence.data, condition.to.remove, by.col
   #   The cleaned data.table
   #
   
-  # Order the table by Condition or Raw.file depending on the experiment
-  if (by.column == "condition") {
-    setkey(evidence.data, condition)
-  } else {
-    setkey(evidence.data, raw.file)
-  }
+  # Order the table by Condition or Raw.file or Spectrum File depending on the experiment and the dataset origin
+  setkeyv(evidence.data, by.column)
   
   switch(condition.to.remove,
          "BLANK" = {
@@ -1238,13 +1292,7 @@ clear.user.condition.rows <- function(evidence.data, condition.to.remove, by.col
            clear.evidence.data <- evidence.data[!"2"]
          },
          "NA" = {
-           if (by.column == "condition") {
-             # Clear the NA condition rows
-             clear.evidence.data <- na.omit(evidence.data, cols = "condition")
-           } else {
-             # Clear the NA raw.file rows
-             clear.evidence.data <- na.omit(evidence.data, cols = "raw.file")
-           }
+           clear.evidence.data <- na.omit(evidence.data, cols = by.column)
          })
   
   # And reset the order to the Protein IDs
@@ -1327,7 +1375,9 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
   switch( status.code,
           {
             # 1:  Proteome-Discoverer Labeled
-            # TODO
+            
+            intensity.columns <- grep("^intensity", colnames(evidence.data), perl = TRUE, value = TRUE)
+            
             evidence.data.subset <- evidence.data[, .SD,
                                                     .SDcols = c("quan.usage",
                                                                 "protein.ids",
@@ -1339,7 +1389,54 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
             setkey(evidence.data.subset, 
                    "description",
                    "protein.ids",
-                   "unique.sequence.id")  
+                   "unique.sequence.id")
+            
+            intensity.column.1 <- intensity.columns[1]
+            
+            # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
+            
+            if (is.isobaric == TRUE) {
+              evidence.data.subset.1 <- evidence.data.subset[, 
+                                                             .("intensity.1" = list(unlist(get(intensity.column.1)))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            } else {
+              evidence.data.subset.1 <- evidence.data.subset[, 
+                                                             .("intensity.1" = list(get(intensity.column.1))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            }
+            
+            
+            setnames(evidence.data.subset.1, "intensity.1", intensity.column.1)
+            
+            intensity.column.2 <- intensity.columns[2]
+            
+            if (is.isobaric == TRUE) {
+              evidence.data.subset.2 <- evidence.data.subset[, 
+                                                             .("intensity.2" = list(unlist(get(intensity.column.2)))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            } else {
+              evidence.data.subset.2 <- evidence.data.subset[, 
+                                                             .("intensity.2" = list(get(intensity.column.2))),
+                                                             by=.(description,
+                                                                  protein.ids,
+                                                                  unique.sequence.id,
+                                                                  condition)]
+            }
+            
+            
+            setnames(evidence.data.subset.2, "intensity.2", intensity.column.2)
+            
+            evidence.data.subset <- merge(evidence.data.subset.1,
+                                          evidence.data.subset.2)
           },
           {
             # 2:  MaxQuant Labeled
@@ -1555,14 +1652,8 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
     protein.groups.column <- "proteins"
   }
   
-  # Get the index of the protein groups accessions column
-  protein.groups.column.position <- which(colnames(evidence.data) == protein.groups.column)
-  
   # And rename it as Protein IDs
-  evidence.column.names[protein.groups.column.position] <- "protein.ids"
-  
-  # Reset evidence column names
-  evidence.column.names <- colnames(evidence.data)
+  setnames(evidence.data, protein.groups.column, "protein.ids")
   
   # If the data come from the MaxQuant correct the evidence and
   # proteinGroups files
@@ -1578,18 +1669,6 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   
   # And remove any row with empty Protein IDs
   evidence.data <- evidence.data[!""]
-  
-  # In the case of an isobaric labeled experiment we can treat is as if it was label-free,
-  # after some reformating 
-  # if (is.isobaric == TRUE) {
-  #   
-  #   cat("We have an isobaric label file!\n")
-  #   # Reform the evidence data table
-  #   evidence.data <- reform.evidence.isobaric.to.label.free(evidence.data, dataset.origin)
-  #   
-  #   # Set the label.free flag to TRUE
-  #   is.label.free <- TRUE
-  # }
   
   # Reset evidence column names
   evidence.column.names <- colnames(evidence.data)
@@ -1626,6 +1705,7 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   # Clear the data from the rows with specific condition depending on the experiment
   evidence.data <- discard.useless.conditions.per.experiment( evidence.data,
                                                               conditions.to.compare,
+                                                              dataset.origin,
                                                               is.label.free,
                                                               is.isobaric)
   
@@ -1635,13 +1715,15 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
     # "condition"
     evidence.data <- merge(evidence.data,
                            global.variables$experimental.structure,
-                           by = "raw.file")
+                           by.x = evidence.metadata$raw.file,
+                           by.y = "raw.file")
     
   } else {
     # In case of label-free experiment, merge by the "columns raw.file", "condition"
     evidence.data <- merge(evidence.data,
                            global.variables$experimental.structure,
-                           by = c("raw.file", "condition"))
+                           by.x = c(evidence.metadata$raw.file, "condition"),
+                           by.y = c("raw.file", "condition"))
     
   }
   

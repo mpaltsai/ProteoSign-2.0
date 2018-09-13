@@ -101,6 +101,12 @@ trim.and.lowercase.column.names <- function(old.column.names) {
                                         pattern = "[[:space:].]+",
                                         replacement = "."))
   
+  # Trim the column names from "#." found in Proteome Discoverer files
+  trimmed.column.names <- unlist(lapply(trimmed.column.names,
+                                        gsub,
+                                        pattern = "#\\.",
+                                        replacement = ""))
+  
   # Now lowercase the column names
   trimmed.and.lowercased.column.names <- tolower(trimmed.column.names)
   
@@ -122,7 +128,7 @@ keep.only.specific.timestamps.or.cultures <- function(evidence.data,
   #
   
   # Make a copy of the original data
-  data.to.clean <- copy(evidence.data)
+  data.to.clean <- c()
   
   # Keep only wanted timestamp
   for (timestamp.to.keep in timestamps.to.keep) {
@@ -131,11 +137,12 @@ keep.only.specific.timestamps.or.cultures <- function(evidence.data,
     
     # Find the pattern
     timestamp.to.keep.positions <- grep(timestamp.to.keep.pattern,
-                                data.to.clean$raw.file,
-                                perl = TRUE)
+                                        evidence.data$raw.file,
+                                        perl = TRUE)
     
     # And keep only these rows for the specific pattern
-    data.to.clean <- data.to.clean[timestamp.to.keep.positions,]
+    data.to.clean <-rbind(data.to.clean,
+                          evidence.data[timestamp.to.keep.positions,])
   }
   
   # Keep only the wanted subset of the proteome
