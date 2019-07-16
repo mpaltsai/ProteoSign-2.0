@@ -1,7 +1,14 @@
 .Rproj.user
 .Rhistory
+.Rbuildignore
+.Rprofile
 .RData
 .Ruserdata
+..gitignore.swp
+
+Dockerfile
+ProteoSign.Rproj
+*.tar.gz
 src/*.o
 src/*.so
 src/*.dll
