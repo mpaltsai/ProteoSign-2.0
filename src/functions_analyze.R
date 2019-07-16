@@ -59,9 +59,10 @@ make.data.output.folders <- function(analysis.name) {
   
 }
 
-make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.name, is.label.free,
+make.Venn.diagram <- function(evidence.data, conditions.to.compare, 
+                              analysis.name, is.label.free, 
                               minimum.peptide.detections = 1,
-                              min.valid.values.percentance = 50.0,
+                              min.valid.values.percentance = 60.0,
                               minimum.peptides.per.protein = 2,
                               plots.format = 5) {
   #
@@ -77,7 +78,7 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   #                               If the peptide has less than N valid values, its value is considered as NA,
   #                               otherwise we take the median of the intensities.
   #
-  #   min.valid.values.percentance: Default is 50.0. The percentance of valid values for a given peptide across N samples.
+  #   min.valid.values.percentance: Default is 60.0. The percentance of valid values for a given peptide across N samples.
   #                                 If the peptide has less than N% valid values, it is disqualified from any further analysis.
   #
   #   minimum.peptides.per.protein: Default is 2. A strictness parameter regarding how many peptides should a protein have
@@ -128,13 +129,13 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare, analysis.nam
   
   # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
   # replicates on the x axis
-  condition.A <- dcast(condition.A,
+  condition.A <- dcast.data.table(condition.A,
                      protein.ids + unique.sequence.id ~ description,
                      value.var = condition.A.column,
                      fun.aggregate = use.peptides.median,
                      minimum.peptide.detections = minimum.peptide.detections)
   
-  condition.B <- dcast(condition.B,
+  condition.B <- dcast.data.table(condition.B,
                        protein.ids + unique.sequence.id ~ description,
                        value.var = condition.B.column,
                        fun.aggregate = use.peptides.median,
@@ -325,7 +326,8 @@ save.intermediate.data.tables <- function(data, file.name, analysis.name,
 
 filter.out.reverse.and.contaminants <- function(analysis.data) {
   #
-  # Removes Contamintants, Reverse flagged peptides and only identified by site from the evidence data
+  # Removes Contamintants, Reverse flagged peptides and only identified by site
+  # from the evidence data set comes from MaxQuant
   # 
   # Args:
   #   analysis.data: The analysis.data 
@@ -423,7 +425,7 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     
     # Transfrorm the data from long format to wide where we have the peptides on the y axis and the biological
     # replicates on the x axis
-    wide.data <- dcast(data,
+    wide.data <- dcast.data.table(data,
                        protein.ids + unique.sequence.id ~ biological.replicate,
                        value.var = condition,
                        fun.aggregate = use.peptides.median,
@@ -434,9 +436,23 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
     
     # Do the normalization and suppress the warnings regardind the NA removal the the vsn package throws by default
     if (do.norm == TRUE) {
-      suppressWarnings(vsn.matrix.normalized <- justvsn(vsn.matrix,verbose = FALSE))
+      vsn.matrix.normalized <- tryCatch({
+        suppressWarnings(justvsn(vsn.matrix,
+                                 verbose = FALSE))
+      },
+      error = function(cond){
+        message(paste0("Condition ", condition," has bad values and VSN cannot converge,
+                   falling back to unnormalized values."))
+        
+        return (NULL)
+      })
+                       
     } else {
       vsn.matrix.normalized <- vsn.matrix
+    }
+    
+    if (is.null(vsn.matrix.normalized) ==TRUE) {
+      return (NULL)
     }
     
     # Replace the old values of the matrix with the new
@@ -669,14 +685,14 @@ do.peptide.intensities.plots <- function(not.normalized.data, vsn.normalized.dat
 
 do.QRILC.imputation <- function(vsn.normalized.data,
                               conditions.to.compare,
-                              min.valid.values.percentance = 50.0) {
+                              min.valid.values.percentance = 60.0) {
   #
   # Does left-censored missing data imputation using quantile regression imputation of left-censored data method
   #
   # Args:
   #   vsn.normalized.data:  The normalized data.table
   #   conditions.to.compare:  The conditions to compare
-  #   min.valid.values.percentance: Default is 50.0. The percentance of valid values for a given peptide across N samples.
+  #   min.valid.values.percentance: Default is 60.0. The percentance of valid values for a given peptide across N samples.
   #                                 If the peptide has less than N% valid values, it is disqualified from any further analysis.
   # Returns:
   #   The imputated data.table
@@ -715,24 +731,22 @@ do.QRILC.imputation <- function(vsn.normalized.data,
                                         samples.column.number.B,
                .SDcols = c(condition.B.columns)]
   
-  # Now add the two columns with the percentances
-  imputed.data[, valid.percentance := Reduce("+", .SD),
-               .SDcols = c("valid.percentance.A",
-                           "valid.percentance.B")]
+  # Then find the rows where the sum of the percentances is greater or equal
+  # to the minimum percentance times 2
+  rows.with.good.observations.A <- which(imputed.data$valid.percentance.A >= min.valid.values.percentance)
+  
+  rows.with.good.observations.B <- which(imputed.data$valid.percentance.B >= min.valid.values.percentance)
+  
+  
+  rows.with.good.observations <- intersect(rows.with.good.observations.A,
+                                           rows.with.good.observations.B)
   
   # Remove the unused columns
   imputed.data[, valid.percentance.A := NULL]
   imputed.data[, valid.percentance.B := NULL]
   
-  # Then find the rows where the sum of the percentances is greater or equal
-  # to the minimum percentance times 2
-  rows.with.good.observations <- which(imputed.data$valid.percentance >= 2 * min.valid.values.percentance)
-  
   # Keep only them
   imputed.data <- imputed.data[rows.with.good.observations, ]
-  
-  # Remove the useless valid.percentance column
-  imputed.data <- imputed.data[, valid.percentance := NULL]
   
   # Split the data of the 2 conditions
   imputed.data.A <- imputed.data[, .SD, .SDcols = condition.A.columns]
@@ -744,11 +758,18 @@ do.QRILC.imputation <- function(vsn.normalized.data,
   
   # Now for each condition, do the imputation and reset the seed
   # in order to  have reproducibility
-  set.seed(24101992)
-  imputed.data.A <- impute.QRILC(imputed.data.A, tune.sigma = sigma.A)[[1]]
-  set.seed(24101992)
-  imputed.data.B <- impute.QRILC(imputed.data.B, tune.sigma = sigma.B)[[1]]
-
+  tryCatch({
+    set.seed(24101992)
+    imputed.data.A <- impute.QRILC(imputed.data.A, tune.sigma = sigma.A)[[1]]
+    set.seed(24101992)
+    imputed.data.B <- impute.QRILC(imputed.data.B, tune.sigma = sigma.B)[[1]]
+    },
+    error = function(error) {
+      message(paste0("Error in imputation step, possible due to replicate
+                     filled with NAs."))
+      stop(paste0("Analysis is terminated."))
+      return (FALSE) 
+    })
   # Find the common columns
   common.columns <- setdiff(colnames(imputed.data),
                             c(condition.A.columns,
@@ -1576,11 +1597,19 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   
   limma.fit.contrast <- contrasts.fit(limma.fit, contrast.matrix)
   
-  # And calculates the statistics
-  limma.fit.treat <- treat(limma.fit.contrast,
+  if (fold.change.cut.off == 0) {
+    # And calculates the statistics
+    limma.fit.treat <- eBayes(limma.fit.contrast,
+                             trend = TRUE,
+                             robust = TRUE)
+  } else {
+    # And calculates the statistics
+    limma.fit.treat <- treat(limma.fit.contrast,
                              lfc = log2(fold.change.cut.off),
                              trend = TRUE,
                              robust = TRUE)
+  }
+  
 
   # Make a data.frame with the statistics for each protein, sorted by p-value, either it is significant or not
   limma.results <- topTreat(limma.fit.treat,
@@ -1594,10 +1623,20 @@ do.limma.analysis <- function(aggregated.data, conditions.to.compare, experiment
   # And restore the rownames to numbers
   rownames(limma.results) <- 1:nrow(limma.results)
   
-  # Depending on the the results conservativeness, use the appropriate method
-  limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
-                                              limma.results$adj.P.Val  < FDR
-
+  if (error.correction.method == "BH") {
+    
+    # Depending on the the results conservativeness,
+    # use the appropriate method
+    limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                limma.results$adj.P.Val  < FDR
+  } else {
+    # Now mark the differentially expressed
+    limma.results$is.diffenetially.expressed =  (abs(limma.results$logFC) > fold.change.cut.off) &
+                                                limma.results$adj.P.Val  < 0.05
+    
+  }
+  
+  
   return (limma.results)
 }
 

@@ -199,8 +199,8 @@ merge.reporter.intensity.columns <- function(evidence.data, tags.to.conditions) 
   evidence.data.B.melted <- melt(evidence.data.B, id.vars = "id")
   
   # Now dcast the so the different columns will be combined into a list
-  evidence.data.A.merged <- dcast(evidence.data.A.melted, id~0, fun.aggregate = list)
-  evidence.data.B.merged <- dcast(evidence.data.B.melted, id~0, fun.aggregate = list)
+  evidence.data.A.merged <- dcast.data.table(evidence.data.A.melted, id~0, fun.aggregate = list)
+  evidence.data.B.merged <- dcast.data.table(evidence.data.B.melted, id~0, fun.aggregate = list)
   
   # Fix the name of the newly created column 
   setnames(evidence.data.A.merged, ".", condition.A.column)
@@ -556,33 +556,33 @@ make.experimental.description <- function(experimental.setup.id, biological.repl
   # And pasted the appropriate columns based on the experimental id
   switch(experimental.setup.id,
          {
-           cat("We have bioreps.\n")
+           cat("Experiment Setup: Biological replicates only.\n")
            experimental.description <- paste0( experimental.description.biological,
                                                paste0("T", 1),
                                                paste0("F", 1))
          },
          {
-           cat("No bioreps, no fractions? Really? \n")
+           cat("Experiment Setup: No Biological replicates, no fractions.\n")
            cat("Invalid experimental description id in make.experimental.description function.\n")  
            return (FALSE)
          },
          {
-           cat("We have bioreps and techreps.\n")
+           cat("Experiment Setup: Biological replicates and technical replicates.\n")
            experimental.description <- paste0(experimental.description.biological,
                                               experimental.description.technical,
                                               paste0("F", 1))
          },
          {
-           cat("We have bioreps and fractions.\n")
+           cat("Experiment Setup: Biological replicates and fractions.\n")
            experimental.description <- paste0(experimental.description.biological,
                                               paste0("T", 1),
                                               experimental.description.fractions)
          },
          {
-           stop("No bioreps? Really? Invalid experimental description id in make.experimental.description function.\n")  
+           stop("Experiment Setup: No Biological replicates.\n Invalid experimental description id in make.experimental.description function.\n")  
          },
          {
-           cat("We have bioreps, techreps and fractions.\n")
+           cat("Experiment Setup: Biological replicates, technical replicates and fractions.\n")
            experimental.description <- paste0(experimental.description.biological,
                                               experimental.description.technical,
                                               experimental.description.fractions)
@@ -1526,8 +1526,7 @@ bring.data.to.common.format <- function(evidence.data, dataset.origin, is.label.
             
             # Get maximum PSM intensity per peptide/protein/[(rep_desc/label) = raw_file]
             evidence.data.subset <- evidence.data.subset[, 
-                                                         .("intensities" = paste(get(intensity.column),
-                                                                                 collapse = ";")),
+                                                         .("intensities" = list(get(intensity.column))),
                                                          by=.(description,
                                                               protein.ids,
                                                               unique.sequence.id,
@@ -1636,7 +1635,6 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   #   A tranformed data.table with only the needed column for the analysis
   #
   
-  
   # Initialize the protein groups column
   protein.groups.column <- ""
   
@@ -1687,6 +1685,8 @@ build.analysis.data <- function(protein.groups.data, evidence.data, dataset.orig
   evidence.data$protein.ids <- trim.evidence.data.protein.descriptions( evidence.data,
                                                                         protein.description.column)
   
+  
+  # Maybe this is redundant
   # Store the raw.file column and the condition/label column depending on the data origin
   evidence.metadata <- get.evidence.metadata(colnames(evidence.data),
                                              dataset.origin,

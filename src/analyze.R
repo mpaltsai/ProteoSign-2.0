@@ -19,6 +19,7 @@ analysis.data <- global.variables[["analysis.data"]]
 minimum.peptide.detections <- global.variables[["minimum.peptide.detections"]]
 minimum.peptides.per.protein <- global.variables[["minimum.peptides.per.protein"]]
 min.valid.values.percentance <- global.variables[["min.valid.values.percentance"]]
+dataset.origin <- global.variables[["dataset.origin"]]
 
 # Get the experiment metadata
 experimental.metadata <- global.variables[["experimental.metadata"]]
@@ -62,8 +63,16 @@ save.intermediate.data.tables(analysis.data, deparse(substitute(analysis.data)),
 
 ### FILTERING STEP ###
 
-# Filter out contaminants, reverse sequences and only identified by site
-filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
+# If the dataset comes from MaxQuant
+if (dataset.origin == "MaxQuant") {
+  
+  # Filter out contaminants, reverse sequences and only identified by site 
+  filtered.data <- filter.out.reverse.and.contaminants(analysis.data)
+} else {
+  
+  # If the data set comes from Proteome Discoverer, then the filtering has already been done
+  filtered.data <- copy(analysis.data)
+} 
 
 # Save the data.table to the intermediate-data
 save.intermediate.data.tables(filtered.data,
@@ -76,11 +85,15 @@ save.intermediate.data.tables(filtered.data,
 vsn.normalized.data <- do.vsn.normalization(filtered.data,
                                             conditions.to.compare,
                                             minimum.peptide.detections = minimum.peptide.detections)
-
-not.normalized.data <- do.vsn.normalization(filtered.data,
-                                            conditions.to.compare,
-                                            minimum.peptide.detections = minimum.peptide.detections,
-                                            do.norm = FALSE)
+if (is.null(vsn.normalized.data) == FALSE) {
+  
+  not.normalized.data <- do.vsn.normalization(filtered.data,
+                                              conditions.to.compare,
+                                              minimum.peptide.detections = minimum.peptide.detections,
+                                              do.norm = FALSE)
+} else {
+  vsn.normalized.data <- copy(not.normalized.data)
+}
 
 # Plot the intensities before and after the normalizations
 do.peptide.intensities.plots(not.normalized.data,
@@ -128,54 +141,54 @@ limma.results <- do.limma.analysis(aggregated.data,
                                    error.correction.method = error.correction.method,
                                    fold.change.cut.off = fold.change.cut.off,
                                    FDR = FDR)
-
-# Save the data.table to the intermediate-data
-save.intermediate.data.tables(limma.results,
-                              deparse(substitute(limma.results)),
+  
+  # Save the data.table to the intermediate-data
+  save.intermediate.data.tables(limma.results,
+                                deparse(substitute(limma.results)),
+                                analysis.name,
+                                output.folder = "limma-output")
+  
+  ### FINAL PLOTS ###
+  
+  # Do the volcano plots
+  do.volcano.plots(limma.results,
+                   conditions.to.compare,
+                   analysis.name,
+                   plots.format = plots.format,
+                   error.correction.method = error.correction.method,
+                   fold.change.cut.off = fold.change.cut.off,
+                   FDR = FDR)
+  
+  # Do the fold change histograms
+  do.fold.change.histogram(limma.results,
+                           conditions.to.compare,
+                           analysis.name,
+                           plots.format = plots.format)
+  
+  # Do the MA plots
+  do.MA.plots(limma.results,
+              conditions.to.compare,
+              analysis.name,
+              plots.format = plots.format)
+  
+  # Do value order plots
+  do.value.ordered.ratio.plot(limma.results,
+                              conditions.to.compare,
                               analysis.name,
-                              output.folder = "limma-output")
-
-### FINAL PLOTS ###
-
-# Do the volcano plots
-do.volcano.plots(limma.results,
-                 conditions.to.compare,
-                 analysis.name,
-                 plots.format = plots.format,
-                 error.correction.method = error.correction.method,
-                 fold.change.cut.off = fold.change.cut.off,
-                 FDR = FDR)
-
-# Do the fold change histograms
-do.fold.change.histogram(limma.results,
-                         conditions.to.compare,
-                         analysis.name,
-                         plots.format = plots.format)
-
-# Do the MA plots
-do.MA.plots(limma.results,
-            conditions.to.compare,
-            analysis.name,
-            plots.format = plots.format)
-
-# Do value order plots
-do.value.ordered.ratio.plot(limma.results,
-                            conditions.to.compare,
-                            analysis.name,
-                            plots.format = plots.format)
-
-# 
-# # Remove the build.R and functions_build.R from the enviroment
-# functions.in.analyze.R <- list.functions.in.file("analyze.R")
-# functions.in.analyze.R <- functions.in.analyze.R$.GlobalEnv
-# 
-# functions.in.functions_analyze.R <- list.functions.in.file("functions_analyze.R")
-# functions.in.functions_analyze.R <- functions.in.functions_analyze.R$.GlobalEnv
-# 
-# rm(list = c(functions.in.analyze.R, functions.in.functions_analyze.R))
-
-cat("========== End of analyze.R ==========\n")
-
-cat(date(),"end \n")
-
-setwd(here())
+                              plots.format = plots.format)
+  
+  # 
+  # # Remove the build.R and functions_build.R from the enviroment
+  # functions.in.analyze.R <- list.functions.in.file("analyze.R")
+  # functions.in.analyze.R <- functions.in.analyze.R$.GlobalEnv
+  # 
+  # functions.in.functions_analyze.R <- list.functions.in.file("functions_analyze.R")
+  # functions.in.functions_analyze.R <- functions.in.functions_analyze.R$.GlobalEnv
+  # 
+  # rm(list = c(functions.in.analyze.R, functions.in.functions_analyze.R))
+  
+  cat("========== End of analyze.R ==========\n")
+  
+  cat(date(),"end \n")
+  
+  setwd(here())

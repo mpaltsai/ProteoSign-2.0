@@ -110,7 +110,7 @@ cat("Reading evidence file: ", evidence.file,"...\n", sep = "")
 cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", evidence.file)
 
 # Read the evidence data but only for the needed columns
-evidence.data <- fread(cleaning.command,
+evidence.data <- fread(cmd = cleaning.command,
                        integer64 = "numeric")
 
 # Get the evidence data column names
@@ -128,7 +128,7 @@ evidence.data.column.names <- colnames(evidence.data)
 
 # 1:  For Isotopic experiment e.g. SILAC
 # 2:  For Label-free
-# 3:  For Isobaric e.g. TMT
+# 3:  For Isobaric e.g. TMT, iTRAQ
 # Make an experimental setup code for fast case switch
 experimental.type <-  (is.label.free * 1) +
                       (is.isobaric * 2)   + 1
@@ -200,7 +200,88 @@ if (dataset.origin == "MaxQuant") {
   
   
 } else {
+  
+  # Create and add an icrement id column
+  evidence.data <- evidence.data[, id := seq_len(.N)]
+  
+  # Also update the trimmed columns
+  trimmed.and.lowercased.column.names <- c("id", trimmed.and.lowercased.column.names)
+  
+  # Get the evidence data column names
+  evidence.data.column.names <- colnames(evidence.data)
+  
+  # Default evidence columns
+  proteome.discoverer.default.columns <- c( "id",
+                                            "unique.sequence.id",
+                                            "annotated.sequence",
+                                            "spectrum.file",
+                                            "modifications",
+                                            "protein.group.accessions",
+                                            "protein.accessions",
+                                            "protein.descriptions",
+                                            "quan.usage",
+                                            "peptide.quan.usage",
+                                            "proteins",
+                                            "protein.groups")
+              
+  
+  # Remove Default 
+  irrelevant.columns <- c(  "accession", "accessions", "activation.type", "ambiguity",
+                            "annotation",
+                            "biological.process",
+                            "cellular.component", "charge", "checked", "concatenated.rank",
+                            "confidence", "confidence.level", "counter",
+                            "deltacn", "deltascore", "description", "decoy.peptides.matched",
+                            "exp.value",
+                            "file.id", "first.scan",
+                            "gene.ids",
+                            "homology.threshold",
+                            "identifying.node", "identifying.node.no", "identifying.node.type",
+                            "identity.high", "identity.middle", "ions.matched", "ionscore",
+                            "last.scan",
+                            "marked.as", "master.protein.accessions", "master.scan(s)", "matched.ions",
+                            "meetsallcriteria", "missed.cleavages", "molecular.function",
+                            "ms.order", "missing.channels",
+                            "off.by.x", "original.precursor.charge",
+                            "pep", "peptides.matched", "percolator.pep", "percolator.q-value", "pfam.ids",
+                            "phosphors.isoform.probability", "phosphors.site.probabilities", "position.in.protein",
+                            "precursor.area", "probability", "processing.node.no", "ptmrs:.best.site.probabilities",
+                            "psm.ambiguity",
+                            "q-value", "quan.info", "quan.result.id", "quanresultid",
+                            "quan.channel",
+                            "rank", "reporter.quan.result.id",
+                            "search.engine.rank", "search.id", "search.space", "sequence", "search.engine.rank",
+                            "spscore", "single-peak.channels",
+                            "testintensity", "total.intensity", "total.ions",
+                            "xcorr",
+                            "δcn", "σproteins")
+  
+  
+  # Remove the irrelevant columns
+  columns.to.keep <- setdiff(trimmed.and.lowercased.column.names,
+                             irrelevant.columns)
+  
+  # Find the columns that contain "[" 
+  columns.with.brackets <- grep("(.*\\.?)+\\[", columns.to.keep)
+  
+  # Find the columns that contain "/"
+  columns.with.slashes <- grep(".*/.*", columns.to.keep)
+  
+  # Wrap the up
+  columns.with.symbols <- c(columns.with.brackets, columns.with.slashes)
+  
+  # Remove the columns that contain symbols
+  columns.to.keep <- columns.to.keep[-c(columns.with.symbols)]
+  
+  # Get the non intensity columns
+  non.intensity.columns <- intersect(columns.to.keep,
+                                     proteome.discoverer.default.columns)
+  
+  intensity.columns <- setdiff(columns.to.keep,
+                               non.intensity.columns)
+  
   switch( experimental.type,
+          
           {
             # Proteome Discoverer Isotopic
             
@@ -228,30 +309,54 @@ if (dataset.origin == "MaxQuant") {
           },
           {
             # Proteome Discoverer Label-Free
+            # Prepare the intensity columns
+            intensity.columns <- c("intensity")
           },
           {
             # Proteome Discoverer Isobaric
+            
+            # Remove the intensity column from the column list
+            intensity.columns <- intensity.columns[which( intensity.columns != "intensity")]
+            
+            # And from the data.table
+            evidence.data <- evidence.data[, intensity := NULL]
+            
+            # Rename the intensity columns
+            reporter.intensity.columns <- paste0("reporter.intensity.",
+                                                 intensity.columns)
+            
+            # Get the tags from the tags.to.conditions.matrix
+            tags <- tags.to.conditions.matrix$tag
+            
+            if (length(tags) == length(reporter.intensity.columns) &&
+                tags == reporter.intensity.columns) {
+              print("Tags match to Proteome Discoverer column names!\n")
+            } else {
+              stop("Tags does not match to Proteome Discoverer column names...\n")
+            }
+            
+            # Rename all the columns at once
+            setnames(evidence.data, 
+                     old = intensity.columns,
+                     new = reporter.intensity.columns)
+            
+            # Update the intensity colummns
+            intensity.columns <- reporter.intensity.columns
           })
   
   # Case proteome discoverer
-  evindence.columns.to.keep <- c("unique.sequence.id",
-                                 "annotated.sequence",
-                                 "spectrum.file",
-                                 # "modifications",
-                                 "protein.group.accessions",
-                                 "protein.accessions",
-                                 "protein.descriptions",
-                                 "quan.usage",
-                                 "peptide.quan.usage",
+  evindence.columns.to.keep <- c(non.intensity.columns,
                                  intensity.columns)
-  
-  # In any case, we take the intersection
-  evindence.columns.subset <- intersect(evidence.data.column.names,
-                                        evindence.columns.to.keep)
   
   # Now subset the columns to keep only the needed, in order to make
   # the data.table as light-weight as possible
-  evidence.data <- evidence.data[, .SD, .SDcols = evindence.columns.subset]
+  evidence.data <- evidence.data[, .SD, .SDcols = evindence.columns.to.keep]
+  
+  # And reorder the column names
+  setcolorder(evidence.data, evindence.columns.to.keep)
+  
+  # And set the spectrum file colname to raw.file
+  # setnames(evidence.data, "spectrum.file", "raw.file")
 }
 
 cat("Evidence file loaded!\n")
@@ -296,7 +401,7 @@ if (dataset.origin == "MaxQuant") {
   cleaning.command <-  paste("tr -d \'\"\\\\\"\' <", protein.groups.file)
   
   # Read the proteinGroups data
-  protein.groups.data <- fread(cleaning.command,
+  protein.groups.data <- fread(cmd = cleaning.command,
                                integer64 = "numeric")
   
   # Get the protein.groups.data column names

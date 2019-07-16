@@ -15,7 +15,6 @@ gc(verbose = FALSE,
 
 # Project Packages to be installed
 cran.packages <- c( "ggplot2",
-                    "NCmisc",
                     "data.table",
                     "VennDiagram",
                     "splitstackshape",

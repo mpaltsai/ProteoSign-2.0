@@ -59,6 +59,7 @@ if (is.label.free == TRUE) {
   # Add conditions.to.raw.files.list to the global variables list
   global.variables[["conditions.to.raw.files.list"]] <- conditions.to.raw.files.list
   
+  print("Experiment type: Label-free Experiment")
 } 
 
 # In case of isobaric experiment, fix the evidence columns
@@ -67,10 +68,10 @@ if (is.isobaric == TRUE) {
   # The the tags to conditions
   tags.to.conditions <- global.variables[["tags.to.conditions"]]
   
-  # And combine the "reporter.intensities.X" columns into one for each condition and convert 0s to NAs
+  # And combine the "reporter.intensity.X" columns into one for each condition and convert 0s to NAs
   evidence.data <- merge.reporter.intensity.columns(evidence.data, tags.to.conditions)
   
-  
+  print("Experiment type: Isobaric Experiment (TMT or iTRAQ)")
 }
 
 # If we are on a label-free experiment, add the conditions, otherwise just add a generic description
@@ -252,22 +253,35 @@ if (length(experiment.type) == 1) {
 } else {
   
   # Cast the multiline conditions to 2 columns Condition1 Condition2 with their peptides' intensities
-  analysis.data <- dcast.data.table(analysis.data[, 
-                                                  by=.( description,
-                                                        protein.ids,
-                                                        unique.sequence.id,
-                                                        condition)],
-                                    description + protein.ids + unique.sequence.id ~ condition,
-                                    value.var = "intensities",
-                                    fill = NA)
+  analysis.data.mixed <- dcast.data.table(analysis.data,
+                                          description + protein.ids + unique.sequence.id ~ condition,
+                                          value.var = "intensities")
+  
+  # Score with 1 or 0 (True or False) if we have at least one intensity
+  # for each peptide
+  peptides.present.in.analysis.data <- dcast.data.table(analysis.data,
+                                                        description + protein.ids + unique.sequence.id ~ condition,
+                                                        value.var = "intensities",
+                                                        fun.aggregate = length)
+  
+  # Find the peptides detected in condition A
+  peptides.present.in.condition.A <- which(peptides.present.in.analysis.data[[experiment.type[1]]] == 1)
+  
+  # Find the peptides detected in condition B
+  peptides.present.in.condition.B <- which(peptides.present.in.analysis.data[[experiment.type[2]]] == 1)
+  
+  # Now get the intersection
+  peptides.present.in.both.conditions <- intersect(peptides.present.in.condition.A, 
+                                                   peptides.present.in.condition.B)
+  
+  # And subset the analysis.data to get the peptides that exist in both conditions
+  analysis.data <- analysis.data.mixed[peptides.present.in.both.conditions, ]
   
   # Remove NA proteins
   analysis.data <- na.omit(analysis.data, cols = "protein.ids")
   
   global.variables[["evidence.data"]] <- copy(analysis.data)
   
-  # Keep only the peptides that were present in both conditions
-  analysis.data <- na.omit(analysis.data, cols = conditions.to.compare) 
 }
 
 # Store the data in a global variable
