@@ -91,7 +91,7 @@ if (dir.exists("packrat") == FALSE &
   
   library("packrat")
   
-  # Set packrat mode ON
+  # # Set packrat mode ON
   packrat_mode(on = TRUE)
   
   if (all(cran.packages %in% .packages()) == FALSE) {

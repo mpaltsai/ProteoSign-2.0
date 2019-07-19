@@ -123,6 +123,21 @@ make.Venn.diagram <- function(evidence.data, conditions.to.compare,
     condition.B <- data[, .SD, .SDcols = !c(condition.A.column, "condition")]
   }
   
+  # Split multi preotein ids
+  condition.A <- cSplit(condition.A, "protein.ids", sep=";", direction = "long")
+  condition.B <- cSplit(condition.B, "protein.ids", sep=";", direction = "long")
+  
+  # Remove descriptions from protein ids columns
+  condition.A$protein.ids <- gsub(" \\[.*", "",
+                                  condition.A$protein.ids,
+                                  perl = TRUE,
+                                  fixed = FALSE)
+  
+  condition.B$protein.ids <- gsub(" \\[.*", "",
+                                  condition.B$protein.ids,
+                                  perl = TRUE,
+                                  fixed = FALSE)
+  
   # Filter out contaminants
   condition.A <- filter.out.reverse.and.contaminants(condition.A)
   condition.B <- filter.out.reverse.and.contaminants(condition.B)
