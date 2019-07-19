@@ -284,6 +284,16 @@ if (length(experiment.type) == 1) {
   
 }
 
+# Split multi preotein ids
+analysis.data <- cSplit(analysis.data, "protein.ids", sep=";", direction = "long")
+
+# Remove descriptions from protein ids columns
+analysis.data$protein.ids <- gsub(" \\[.*", "",
+                                  analysis.data$protein.ids,
+                                  perl = TRUE,
+                                  fixed = FALSE)
+
+
 # Store the data in a global variable
 global.variables[["analysis.data"]] <- analysis.data
 

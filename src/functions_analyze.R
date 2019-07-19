@@ -456,6 +456,7 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
                                  verbose = FALSE))
       },
       error = function(cond){
+        # In some rare cases the vsn method does not converge
         message(paste0("Condition ", condition," has bad values and VSN cannot converge,
                    falling back to unnormalized values."))
         
@@ -466,7 +467,7 @@ do.vsn.normalization <- function(filtered.data, conditions.to.compare,
       vsn.matrix.normalized <- vsn.matrix
     }
     
-    if (is.null(vsn.matrix.normalized) ==TRUE) {
+    if (is.null(vsn.matrix.normalized) == TRUE) {
       return (NULL)
     }
     
