@@ -5,6 +5,6 @@ rm(list=ls())
 gc(verbose = FALSE,
    reset = TRUE)
 
-setwd("/home/theodor/ProteoSign-2.0/")
+setwd("/home/ismini/Documents/bioinfo-grad/ProteoSign-2.0/")
 
 source("src/main.R")
